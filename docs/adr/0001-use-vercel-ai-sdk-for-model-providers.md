@@ -1,0 +1,3 @@
+# Use Vercel AI SDK for model providers
+
+Benben AI will normalize OpenAI, Anthropic, and OpenAI-compatible model calls through Vercel AI SDK Core and its provider packages instead of integrating each vendor SDK directly. This gives Chat and Model Translation one streaming, cancellation, and multi-turn interface while requests still go directly to the user-selected provider with BYOK credentials; the trade-off is accepting an additional dependency and possible lag for newly released provider features. Google Translation and Baidu Translation remain separate REST integrations because they are Reference Translations, not Model Providers.

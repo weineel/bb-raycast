@@ -1,0 +1,393 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "benben-ai",
+  "title": "Benben AI",
+  "description": "Chat with leading AI providers and compare professional AI, Google, and Baidu translations.",
+  "icon": "icon.png",
+  "author": "TODO",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.4",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "platforms": [
+    "macOS"
+  ],
+  "keywords": [
+    "ai",
+    "chat",
+    "translate",
+    "openai",
+    "anthropic",
+    "google",
+    "baidu"
+  ],
+  "commands": [
+    {
+      "name": "chat",
+      "title": "Chat",
+      "subtitle": "Benben AI",
+      "description": "Ask a question, explain a term, and continue the conversation",
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "providerOverride",
+          "title": "Model Provider",
+          "description": "Override the global provider for Chat",
+          "type": "dropdown",
+          "required": true,
+          "default": "global",
+          "data": [
+            {
+              "title": "Use Global Default",
+              "value": "global"
+            },
+            {
+              "title": "OpenAI",
+              "value": "openai"
+            },
+            {
+              "title": "Anthropic",
+              "value": "anthropic"
+            },
+            {
+              "title": "OpenAI-Compatible",
+              "value": "openai-compatible"
+            }
+          ]
+        },
+        {
+          "name": "modelOverride",
+          "title": "Model ID",
+          "description": "Optional model override for Chat",
+          "type": "textfield",
+          "required": false,
+          "placeholder": "Use the selected provider's global model"
+        }
+      ]
+    },
+    {
+      "name": "translate",
+      "title": "Translate",
+      "subtitle": "Benben AI",
+      "description": "Compare AI, Google, and Baidu translations and refine the AI result",
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "providerOverride",
+          "title": "Model Provider",
+          "description": "Override the global provider for Translate",
+          "type": "dropdown",
+          "required": true,
+          "default": "global",
+          "data": [
+            {
+              "title": "Use Global Default",
+              "value": "global"
+            },
+            {
+              "title": "OpenAI",
+              "value": "openai"
+            },
+            {
+              "title": "Anthropic",
+              "value": "anthropic"
+            },
+            {
+              "title": "OpenAI-Compatible",
+              "value": "openai-compatible"
+            }
+          ]
+        },
+        {
+          "name": "modelOverride",
+          "title": "Model ID",
+          "description": "Optional model override for Translate",
+          "type": "textfield",
+          "required": false,
+          "placeholder": "Use the selected provider's global model"
+        }
+      ]
+    }
+  ],
+  "preferences": [
+    {
+      "name": "defaultProvider",
+      "title": "Default Model Provider",
+      "description": "Used unless a command overrides it",
+      "type": "dropdown",
+      "required": true,
+      "default": "openai",
+      "data": [
+        {
+          "title": "OpenAI",
+          "value": "openai"
+        },
+        {
+          "title": "Anthropic",
+          "value": "anthropic"
+        },
+        {
+          "title": "OpenAI-Compatible",
+          "value": "openai-compatible"
+        }
+      ]
+    },
+    {
+      "name": "defaultOpenAIModel",
+      "title": "OpenAI Model",
+      "description": "Global OpenAI model ID",
+      "type": "textfield",
+      "required": true,
+      "default": "gpt-5.6-terra"
+    },
+    {
+      "name": "defaultAnthropicModel",
+      "title": "Anthropic Model",
+      "description": "Global Anthropic model ID",
+      "type": "textfield",
+      "required": true,
+      "default": "claude-sonnet-5"
+    },
+    {
+      "name": "defaultCompatibleModel",
+      "title": "OpenAI-Compatible Model",
+      "description": "Global model ID for the compatible endpoint",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "Your provider's model ID"
+    },
+    {
+      "name": "openaiApiKey",
+      "title": "OpenAI API Key",
+      "description": "Sent directly to OpenAI when it is the active provider",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "anthropicApiKey",
+      "title": "Anthropic API Key",
+      "description": "Sent directly to Anthropic when it is the active provider",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "compatibleBaseUrl",
+      "title": "OpenAI-Compatible Base URL",
+      "description": "API root for the compatible provider",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "https://api.example.com/v1"
+    },
+    {
+      "name": "compatibleApiKey",
+      "title": "OpenAI-Compatible API Key",
+      "description": "Sent directly to the configured compatible provider",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "googleApiKey",
+      "title": "Google Cloud Translation API Key",
+      "description": "Optional. Enables the Google reference translation.",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "baiduAppId",
+      "title": "Baidu Translate APP ID",
+      "description": "Optional. Used together with the Baidu Secret Key.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "baiduSecretKey",
+      "title": "Baidu Translate Secret Key",
+      "description": "Optional. Used together with the Baidu APP ID.",
+      "type": "password",
+      "required": false
+    },
+    {
+      "name": "defaultAnswerLanguage",
+      "title": "Default Answer Language",
+      "description": "The language Chat normally responds in",
+      "type": "dropdown",
+      "required": true,
+      "default": "zh-CN",
+      "data": [
+        {
+          "title": "Simplified Chinese",
+          "value": "zh-CN"
+        },
+        {
+          "title": "Traditional Chinese",
+          "value": "zh-TW"
+        },
+        {
+          "title": "English",
+          "value": "en"
+        },
+        {
+          "title": "Japanese",
+          "value": "ja"
+        },
+        {
+          "title": "Korean",
+          "value": "ko"
+        },
+        {
+          "title": "French",
+          "value": "fr"
+        },
+        {
+          "title": "German",
+          "value": "de"
+        },
+        {
+          "title": "Spanish",
+          "value": "es"
+        },
+        {
+          "title": "Portuguese",
+          "value": "pt"
+        },
+        {
+          "title": "Italian",
+          "value": "it"
+        },
+        {
+          "title": "Russian",
+          "value": "ru"
+        },
+        {
+          "title": "Arabic",
+          "value": "ar"
+        },
+        {
+          "title": "Thai",
+          "value": "th"
+        },
+        {
+          "title": "Vietnamese",
+          "value": "vi"
+        },
+        {
+          "title": "Indonesian",
+          "value": "id"
+        },
+        {
+          "title": "Malay",
+          "value": "ms"
+        },
+        {
+          "title": "Hindi",
+          "value": "hi"
+        }
+      ]
+    },
+    {
+      "name": "defaultTargetLanguage",
+      "title": "Default Translation Target",
+      "description": "Initially selected by the Translate command",
+      "type": "dropdown",
+      "required": true,
+      "default": "zh-CN",
+      "data": [
+        {
+          "title": "Simplified Chinese",
+          "value": "zh-CN"
+        },
+        {
+          "title": "Traditional Chinese",
+          "value": "zh-TW"
+        },
+        {
+          "title": "English",
+          "value": "en"
+        },
+        {
+          "title": "Japanese",
+          "value": "ja"
+        },
+        {
+          "title": "Korean",
+          "value": "ko"
+        },
+        {
+          "title": "French",
+          "value": "fr"
+        },
+        {
+          "title": "German",
+          "value": "de"
+        },
+        {
+          "title": "Spanish",
+          "value": "es"
+        },
+        {
+          "title": "Portuguese",
+          "value": "pt"
+        },
+        {
+          "title": "Italian",
+          "value": "it"
+        },
+        {
+          "title": "Russian",
+          "value": "ru"
+        },
+        {
+          "title": "Arabic",
+          "value": "ar"
+        },
+        {
+          "title": "Thai",
+          "value": "th"
+        },
+        {
+          "title": "Vietnamese",
+          "value": "vi"
+        },
+        {
+          "title": "Indonesian",
+          "value": "id"
+        },
+        {
+          "title": "Malay",
+          "value": "ms"
+        },
+        {
+          "title": "Hindi",
+          "value": "hi"
+        }
+      ]
+    }
+  ],
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "pnpm dlx @raycast/api@latest publish",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.18",
+    "@ai-sdk/openai": "^4.0.18",
+    "@ai-sdk/openai-compatible": "^3.0.14",
+    "@raycast/api": "^1.104.23",
+    "ai": "^7.0.35",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/react": "^19.2.17",
+    "eslint": "^10.7.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}
