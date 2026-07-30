@@ -1,10 +1,13 @@
 import {
   Action,
   ActionPanel,
+  Color,
   Detail,
   Form,
   Icon,
   Keyboard,
+  LaunchProps,
+  List,
   Toast,
   getPreferenceValues,
   openCommandPreferences,
@@ -13,30 +16,29 @@ import {
 } from "@raycast/api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
-import { LANGUAGES, getLanguage, type LanguageId } from "./domain/languages";
+import { LaunchError } from "./components/launch-error";
+import { getLanguage, type LanguageId } from "./domain/languages";
 import { createTranslationRequest, createTranslationSystemPrompt } from "./domain/prompts";
+import {
+  createTranslationRows,
+  type TranslationResultState,
+  type TranslationResultStatus,
+  type TranslationRowId,
+} from "./domain/translation-results";
 import { resolveActiveModel, type ActiveModel, type Preferences } from "./domain/preferences";
-import { readDefaultInput } from "./lib/default-input";
+import { getLaunchInputError, type LaunchInput } from "./lib/launch-input";
+import { readLaunchInput } from "./lib/read-launch-input";
 import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
-import { unicodeLength } from "./lib/text-length";
 import { translateWithBaidu } from "./services/baidu-translate";
 import { translateWithGoogle } from "./services/google-translate";
 import { streamModelResponse } from "./services/model";
 
 const MAX_SOURCE_LENGTH = 5_000;
 
-type RequestStatus = "loading" | "success" | "error" | "unconfigured";
-
-interface ReferenceResult {
-  status: RequestStatus;
-  text?: string;
-  error?: string;
-}
-
 interface ModelRevision {
   id: string;
   instruction?: string;
-  status: Exclude<RequestStatus, "unconfigured">;
+  status: Exclude<TranslationResultStatus, "unconfigured">;
   text?: string;
   error?: string;
 }
@@ -45,35 +47,76 @@ function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function referenceMarkdown(name: string, result: ReferenceResult): string {
-  switch (result.status) {
+function statusLabel(status: TranslationResultStatus): string {
+  switch (status) {
     case "loading":
-      return `## ${name}\n\n_Translating…_`;
+      return "Translating";
     case "success":
-      return `## ${name}\n\n${result.text}`;
-    case "unconfigured":
-      return `## ${name}\n\n> ${result.error}`;
+      return "Ready";
     case "error":
-      return `## ${name}\n\n> **Request failed:** ${result.error}`;
+      return "Failed";
+    case "unconfigured":
+      return "Not Configured";
   }
 }
 
-function revisionsMarkdown(revisions: ModelRevision[], activeModel: ActiveModel): string {
-  const content = revisions.map((revision, index) => {
-    const title = index === 0 ? "Latest" : `Previous Revision ${revisions.length - index}`;
-    const context = revision.instruction ? `\n\n_Context supplied: ${revision.instruction}_` : "";
-    if (revision.status === "loading") {
-      return `### ${title}\n\n${revision.text || "_Translating…_"}${context}`;
-    }
-    if (revision.status === "error") {
-      return `### ${title}\n\n${revision.text || ""}\n\n> **Request failed:** ${revision.error}${context}`;
-    }
-    return `### ${title}\n\n${revision.text}${context}`;
-  });
+function statusColor(status: TranslationResultStatus): Color {
+  switch (status) {
+    case "loading":
+      return Color.Orange;
+    case "success":
+      return Color.Green;
+    case "error":
+      return Color.Red;
+    case "unconfigured":
+      return Color.SecondaryText;
+  }
+}
 
-  return `## Model Translation\n\n_${activeModel.provider} · ${activeModel.model}_\n\n${content.join(
-    "\n\n---\n\n",
-  )}`;
+function statusIcon(status: TranslationResultStatus): Icon {
+  switch (status) {
+    case "loading":
+      return Icon.CircleProgress;
+    case "success":
+      return Icon.CheckCircle;
+    case "error":
+      return Icon.XMarkCircle;
+    case "unconfigured":
+      return Icon.Gear;
+  }
+}
+
+function resultMarkdown(result: TranslationResultState): string {
+  switch (result.status) {
+    case "loading":
+      return "_Translating…_";
+    case "success":
+      return result.text || "_No translation returned._";
+    case "error":
+      return `# Request Failed\n\n> ${result.error || "The request failed."}`;
+    case "unconfigured":
+      return `# Not Configured\n\n${result.error || "Open Command Preferences to configure this service."}`;
+  }
+}
+
+function resultMetadata(
+  status: TranslationResultStatus,
+  targetLanguage: LanguageId,
+  extra?: React.ReactNode,
+) {
+  return (
+    <List.Item.Detail.Metadata>
+      <List.Item.Detail.Metadata.Label
+        title="Status"
+        text={{ value: statusLabel(status), color: statusColor(status) }}
+      />
+      <List.Item.Detail.Metadata.Label
+        title="Target Language"
+        text={getLanguage(targetLanguage).label}
+      />
+      {extra}
+    </List.Item.Detail.Metadata>
+  );
 }
 
 function FollowUpForm({ onSubmit }: { onSubmit: (instruction: string) => void }) {
@@ -119,21 +162,92 @@ function FollowUpForm({ onSubmit }: { onSubmit: (instruction: string) => void })
   );
 }
 
+function RevisionHistory({
+  revisions,
+  targetLanguage,
+  activeModel,
+}: {
+  revisions: ModelRevision[];
+  targetLanguage: LanguageId;
+  activeModel: ActiveModel;
+}) {
+  return (
+    <List navigationTitle="Revision History" isShowingDetail>
+      {revisions.map((revision, index) => {
+        const revisionNumber = revisions.length - index;
+        const result: TranslationResultState = revision;
+        return (
+          <List.Item
+            key={revision.id}
+            id={revision.id}
+            title={`Revision ${revisionNumber}`}
+            subtitle={revision.instruction || "Initial translation"}
+            icon={{
+              source: statusIcon(revision.status),
+              tintColor: statusColor(revision.status),
+            }}
+            accessories={[
+              {
+                tag: {
+                  value: statusLabel(revision.status),
+                  color: statusColor(revision.status),
+                },
+              },
+            ]}
+            detail={
+              <List.Item.Detail
+                markdown={resultMarkdown(result)}
+                metadata={resultMetadata(
+                  revision.status,
+                  targetLanguage,
+                  <>
+                    <List.Item.Detail.Metadata.Label title="Provider" text={activeModel.provider} />
+                    <List.Item.Detail.Metadata.Label title="Model" text={activeModel.model} />
+                    <List.Item.Detail.Metadata.Label
+                      title="Revision"
+                      text={`${revisionNumber} of ${revisions.length}`}
+                    />
+                  </>,
+                )}
+              />
+            }
+            actions={
+              revision.text ? (
+                <ActionPanel>
+                  <Action.CopyToClipboard
+                    title="Copy Revision"
+                    content={revision.text}
+                    shortcut={Keyboard.Shortcut.Common.Copy}
+                  />
+                  <Action.Paste title="Paste Revision" content={revision.text} />
+                </ActionPanel>
+              ) : undefined
+            }
+          />
+        );
+      })}
+    </List>
+  );
+}
+
 function TranslateResult({
   sourceText,
   targetLanguage,
   preferences,
   activeModel,
+  modelConfigurationError,
 }: {
   sourceText: string;
   targetLanguage: LanguageId;
   preferences: Preferences;
-  activeModel: ActiveModel;
+  activeModel?: ActiveModel;
+  modelConfigurationError?: string;
 }) {
   const { push } = useNavigation();
+  const [selectedItemId, setSelectedItemId] = useState<TranslationRowId>("model");
   const [revisions, setRevisions] = useState<ModelRevision[]>([]);
-  const [google, setGoogle] = useState<ReferenceResult>({ status: "loading" });
-  const [baidu, setBaidu] = useState<ReferenceResult>({ status: "loading" });
+  const [google, setGoogle] = useState<TranslationResultState>({ status: "loading" });
+  const [baidu, setBaidu] = useState<TranslationResultState>({ status: "loading" });
   const modelMessagesRef = useRef<ModelMessage[]>([
     { role: "user", content: createTranslationRequest(sourceText) },
   ]);
@@ -154,6 +268,8 @@ function TranslateResult({
 
   const runModel = useCallback(
     async (instruction?: string, retry = false) => {
+      if (!activeModel) return;
+
       modelAbortRef.current?.abort();
       const controller = new AbortController();
       modelAbortRef.current = controller;
@@ -258,10 +374,10 @@ function TranslateResult({
   useEffect(() => {
     if (didStartRef.current) return;
     didStartRef.current = true;
-    void runModel();
+    if (activeModel) void runModel();
     void runGoogle();
     void runBaidu();
-  }, [runBaidu, runGoogle, runModel]);
+  }, [activeModel, runBaidu, runGoogle, runModel]);
 
   useEffect(
     () => () => {
@@ -273,196 +389,296 @@ function TranslateResult({
   );
 
   const latestRevision = revisions[0];
-  const modelIsLoading = latestRevision?.status === "loading";
-  const markdown = [
-    revisionsMarkdown(revisions, activeModel),
-    referenceMarkdown("Google Translation", google),
-    referenceMarkdown("Baidu Translation", baidu),
-  ].join("\n\n---\n\n");
+  const model: TranslationResultState = latestRevision
+    ? latestRevision
+    : activeModel
+      ? { status: "loading" }
+      : {
+          status: "unconfigured",
+          error: modelConfigurationError || "The selected Model Provider is not configured.",
+        };
+  const rows = createTranslationRows({
+    model,
+    google,
+    baidu,
+    sourceText,
+    revisionCount: revisions.length,
+  });
+  const isLoading = rows.some((row) => row.status === "loading");
 
-  return (
-    <Detail
-      navigationTitle={`Translate to ${getLanguage(targetLanguage).label}`}
-      markdown={markdown}
-      isLoading={!revisions.length}
-      metadata={
-        <Detail.Metadata>
-          <Detail.Metadata.Label title="Target" text={getLanguage(targetLanguage).label} />
-          <Detail.Metadata.Label title="Provider" text={activeModel.provider} />
-          <Detail.Metadata.Label title="Model" text={activeModel.model} />
-        </Detail.Metadata>
-      }
-      actions={
-        <ActionPanel>
-          {modelIsLoading ? (
-            <Action
-              title="Stop Model Translation"
-              icon={Icon.Stop}
-              onAction={() => modelAbortRef.current?.abort()}
-            />
-          ) : (
-            <Action
-              title="Refine Model Translation"
-              icon={Icon.ArrowRight}
-              onAction={() => push(<FollowUpForm onSubmit={(text) => void runModel(text)} />)}
-            />
-          )}
-          {latestRevision?.text || google.text || baidu.text ? (
-            <>
-              <ActionPanel.Submenu title="Copy Translation" icon={Icon.Clipboard}>
-                {latestRevision?.text ? (
-                  <Action.CopyToClipboard
-                    title="Copy Model Translation"
-                    content={latestRevision.text}
-                    shortcut={Keyboard.Shortcut.Common.Copy}
-                  />
-                ) : null}
-                {google.text ? (
-                  <Action.CopyToClipboard title="Copy Google Translation" content={google.text} />
-                ) : null}
-                {baidu.text ? (
-                  <Action.CopyToClipboard title="Copy Baidu Translation" content={baidu.text} />
-                ) : null}
-              </ActionPanel.Submenu>
-              <ActionPanel.Submenu title="Paste Translation" icon={Icon.TextCursor}>
-                {latestRevision?.text ? (
-                  <Action.Paste title="Paste Model Translation" content={latestRevision.text} />
-                ) : null}
-                {google.text ? (
-                  <Action.Paste title="Paste Google Translation" content={google.text} />
-                ) : null}
-                {baidu.text ? (
-                  <Action.Paste title="Paste Baidu Translation" content={baidu.text} />
-                ) : null}
-              </ActionPanel.Submenu>
-            </>
-          ) : null}
-          {(!modelIsLoading && latestRevision) ||
-          google.status !== "loading" ||
-          baidu.status !== "loading" ? (
-            <ActionPanel.Submenu title="Retry" icon={Icon.RotateClockwise}>
-              {!modelIsLoading && latestRevision ? (
-                <Action
-                  title="Retry Model Translation"
-                  onAction={() => void runModel(undefined, true)}
-                />
-              ) : null}
-              {google.status !== "loading" ? (
-                <Action title="Retry Google Translation" onAction={() => void runGoogle()} />
-              ) : null}
-              {baidu.status !== "loading" ? (
-                <Action title="Retry Baidu Translation" onAction={() => void runBaidu()} />
-              ) : null}
-            </ActionPanel.Submenu>
-          ) : null}
+  function modelActions() {
+    const modelIsLoading = model.status === "loading";
+    return (
+      <ActionPanel>
+        {modelIsLoading && activeModel ? (
+          <Action
+            title="Stop Model Translation"
+            icon={Icon.Stop}
+            onAction={() => modelAbortRef.current?.abort()}
+          />
+        ) : activeModel ? (
+          <Action
+            title="Refine Model Translation"
+            icon={Icon.ArrowRight}
+            onAction={() => push(<FollowUpForm onSubmit={(text) => void runModel(text)} />)}
+          />
+        ) : (
           <Action
             title="Open Command Preferences"
             icon={Icon.Gear}
             onAction={openCommandPreferences}
           />
-        </ActionPanel>
-      }
-    />
-  );
-}
+        )}
+        {latestRevision?.text ? (
+          <>
+            <Action.CopyToClipboard
+              title="Copy Model Translation"
+              content={latestRevision.text}
+              shortcut={Keyboard.Shortcut.Common.Copy}
+            />
+            <Action.Paste title="Paste Model Translation" content={latestRevision.text} />
+          </>
+        ) : null}
+        {!modelIsLoading && latestRevision && activeModel ? (
+          <Action
+            title="Retry Model Translation"
+            icon={Icon.RotateClockwise}
+            shortcut={Keyboard.Shortcut.Common.Refresh}
+            onAction={() => void runModel(undefined, true)}
+          />
+        ) : null}
+        {revisions.length > 1 && activeModel ? (
+          <Action
+            title="View Revision History"
+            icon={Icon.Clock}
+            onAction={() =>
+              push(
+                <RevisionHistory
+                  revisions={revisions}
+                  targetLanguage={targetLanguage}
+                  activeModel={activeModel}
+                />,
+              )
+            }
+          />
+        ) : null}
+        {activeModel ? (
+          <Action
+            title="Open Command Preferences"
+            icon={Icon.Gear}
+            onAction={openCommandPreferences}
+          />
+        ) : null}
+      </ActionPanel>
+    );
+  }
 
-export default function TranslateCommand() {
-  const { push } = useNavigation();
-  const preferences = getPreferenceValues<Preferences>();
-  const [sourceText, setSourceText] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState<LanguageId>(
-    preferences.defaultTargetLanguage as LanguageId,
-  );
-  const didEditRef = useRef(false);
-  const [inputError, setInputError] = useState<string>();
-  const [activeModel, setActiveModel] = useState<ActiveModel>();
-  const [configurationError, setConfigurationError] = useState<string>();
-
-  useEffect(() => {
-    try {
-      setActiveModel(resolveActiveModel(preferences));
-    } catch (error) {
-      setConfigurationError(getSafeErrorMessage(error));
-    }
-  }, [preferences]);
-
-  useEffect(() => {
-    void readDefaultInput().then((text) => {
-      if (!didEditRef.current) setSourceText(text);
-    });
-  }, []);
-
-  function submit() {
-    if (!sourceText.trim()) {
-      setInputError("Enter text to translate.");
-      return;
-    }
-    if (unicodeLength(sourceText) > MAX_SOURCE_LENGTH) {
-      setInputError(
-        `Source Text must be ${MAX_SOURCE_LENGTH.toLocaleString()} characters or fewer.`,
-      );
-      return;
-    }
-    if (!activeModel) {
-      setInputError(configurationError || "Configure a model before translating.");
-      return;
-    }
-    setInputError(undefined);
-    push(
-      <TranslateResult
-        sourceText={sourceText}
-        targetLanguage={targetLanguage}
-        preferences={preferences}
-        activeModel={activeModel}
-      />,
+  function referenceActions(
+    title: string,
+    result: TranslationResultState,
+    retry: () => Promise<void>,
+  ) {
+    return (
+      <ActionPanel>
+        {result.status === "unconfigured" ? (
+          <Action
+            title="Open Command Preferences"
+            icon={Icon.Gear}
+            onAction={openCommandPreferences}
+          />
+        ) : result.text ? (
+          <>
+            <Action.CopyToClipboard
+              title={`Copy ${title}`}
+              content={result.text}
+              shortcut={Keyboard.Shortcut.Common.Copy}
+            />
+            <Action.Paste title={`Paste ${title}`} content={result.text} />
+          </>
+        ) : null}
+        {result.status === "error" ? (
+          <Action
+            title={`Retry ${title}`}
+            icon={Icon.RotateClockwise}
+            shortcut={Keyboard.Shortcut.Common.Refresh}
+            onAction={() => void retry()}
+          />
+        ) : null}
+        {result.status !== "unconfigured" ? (
+          <Action
+            title="Open Command Preferences"
+            icon={Icon.Gear}
+            onAction={openCommandPreferences}
+          />
+        ) : null}
+      </ActionPanel>
     );
   }
 
   return (
-    <Form
-      navigationTitle="Translate"
-      actions={
-        <ActionPanel>
-          <Action.SubmitForm title="Translate" icon={Icon.Globe} onSubmit={submit} />
-          <Action
-            title="Open Command Preferences"
-            icon={Icon.Gear}
-            onAction={openCommandPreferences}
-          />
-        </ActionPanel>
-      }
+    <List
+      navigationTitle={`Translate to ${getLanguage(targetLanguage).label}`}
+      searchBarPlaceholder="Filter translation results"
+      isShowingDetail
+      isLoading={isLoading}
+      selectedItemId={selectedItemId}
+      onSelectionChange={(id) => {
+        if (id) setSelectedItemId(id as TranslationRowId);
+      }}
     >
-      <Form.TextArea
-        id="sourceText"
-        title="Source Text"
-        placeholder="Enter a word, sentence, or passage"
-        value={sourceText}
-        error={inputError}
-        onChange={(value) => {
-          didEditRef.current = true;
-          setSourceText(value);
-          if (inputError) setInputError(undefined);
-        }}
-        autoFocus
-      />
-      <Form.Dropdown
-        id="targetLanguage"
-        title="Target Language"
-        value={targetLanguage}
-        onChange={(value) => setTargetLanguage(value as LanguageId)}
-      >
-        {LANGUAGES.map((language) => (
-          <Form.Dropdown.Item key={language.id} value={language.id} title={language.label} />
-        ))}
-      </Form.Dropdown>
-      <Form.Description
-        title="Model"
-        text={
-          activeModel
-            ? `${activeModel.provider} · ${activeModel.model}`
-            : configurationError || "Not configured"
+      <List.Section title="Translations">
+        {rows.slice(0, 3).map((row) => {
+          const result = row.id === "model" ? model : row.id === "google" ? google : baidu;
+          const isModel = row.id === "model";
+          const icon =
+            row.id === "model" ? Icon.Stars : row.id === "google" ? Icon.Globe : Icon.SpeechBubble;
+          const tintColor =
+            row.id === "model" ? Color.Purple : row.id === "google" ? Color.Blue : Color.Orange;
+          const actions =
+            row.id === "model"
+              ? modelActions()
+              : row.id === "google"
+                ? referenceActions("Google Translation", google, runGoogle)
+                : referenceActions("Baidu Translation", baidu, runBaidu);
+
+          return (
+            <List.Item
+              key={row.id}
+              id={row.id}
+              title={row.title}
+              subtitle={row.preview}
+              icon={{ source: icon, tintColor }}
+              accessories={[
+                ...(row.revisionLabel ? [{ text: row.revisionLabel }] : []),
+                {
+                  tag: {
+                    value: statusLabel(row.status),
+                    color: statusColor(row.status),
+                  },
+                  icon: statusIcon(row.status),
+                },
+              ]}
+              detail={
+                <List.Item.Detail
+                  markdown={resultMarkdown(result)}
+                  metadata={resultMetadata(
+                    result.status,
+                    targetLanguage,
+                    isModel && activeModel ? (
+                      <>
+                        <List.Item.Detail.Metadata.Label
+                          title="Provider"
+                          text={activeModel.provider}
+                        />
+                        <List.Item.Detail.Metadata.Label title="Model" text={activeModel.model} />
+                        <List.Item.Detail.Metadata.Label
+                          title="Revision"
+                          text={`${Math.max(revisions.length, 1)}`}
+                        />
+                      </>
+                    ) : undefined,
+                  )}
+                />
+              }
+              actions={actions}
+            />
+          );
+        })}
+      </List.Section>
+      <List.Section title="Input">
+        <List.Item
+          id="source"
+          title="Source Text"
+          subtitle={rows[3].preview}
+          icon={{ source: Icon.Document, tintColor: Color.SecondaryText }}
+          accessories={[{ text: `${Array.from(sourceText).length.toLocaleString()} characters` }]}
+          detail={
+            <List.Item.Detail
+              markdown={`# Source Text\n\n${sourceText}`}
+              metadata={
+                <List.Item.Detail.Metadata>
+                  <List.Item.Detail.Metadata.Label
+                    title="Target Language"
+                    text={getLanguage(targetLanguage).label}
+                  />
+                </List.Item.Detail.Metadata>
+              }
+            />
+          }
+          actions={
+            <ActionPanel>
+              <Action.CopyToClipboard
+                title="Copy Source Text"
+                content={sourceText}
+                shortcut={Keyboard.Shortcut.Common.Copy}
+              />
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+    </List>
+  );
+}
+
+type TranslateLaunchProps = LaunchProps<{ arguments: Arguments.Translate }>;
+
+export default function TranslateCommand(props: TranslateLaunchProps) {
+  const preferences = getPreferenceValues<Preferences>();
+  const [input, setInput] = useState<LaunchInput>();
+  const [inputError, setInputError] = useState<string>();
+  const [isResolvingInput, setIsResolvingInput] = useState(true);
+
+  useEffect(() => {
+    let isCancelled = false;
+    void readLaunchInput(props.arguments.sourceText, props.fallbackText).then((resolvedInput) => {
+      if (isCancelled) return;
+      setInput(resolvedInput);
+      setInputError(getLaunchInputError(resolvedInput, MAX_SOURCE_LENGTH, "Source Text"));
+      setIsResolvingInput(false);
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [props.arguments.sourceText, props.fallbackText]);
+
+  if (isResolvingInput) {
+    return (
+      <Detail navigationTitle="Translate" markdown="# Translate\n\nResolving input…" isLoading />
+    );
+  }
+
+  if (inputError || !input) {
+    return (
+      <LaunchError
+        title={inputError === "No Input Found" ? "No Input Found" : "Cannot Translate"}
+        message={
+          inputError === "No Input Found"
+            ? "Enter the first command argument, select text, or copy text before running Translate."
+            : inputError || "No Source Text is available."
         }
       />
-    </Form>
+    );
+  }
+
+  let activeModel: ActiveModel | undefined;
+  let modelConfigurationError: string | undefined;
+  try {
+    activeModel = resolveActiveModel(preferences);
+  } catch (error) {
+    modelConfigurationError = getSafeErrorMessage(error);
+  }
+
+  const targetLanguage = getLanguage(
+    props.arguments.targetLanguage || preferences.defaultTargetLanguage,
+  ).id;
+
+  return (
+    <TranslateResult
+      sourceText={input.text}
+      targetLanguage={targetLanguage}
+      preferences={preferences}
+      activeModel={activeModel}
+      modelConfigurationError={modelConfigurationError}
+    />
   );
 }

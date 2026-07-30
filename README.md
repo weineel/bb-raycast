@@ -8,7 +8,8 @@ translation.
 - **Translate** streams a professional model translation with a brief explanation, shows
   independent Google and Baidu reference translations, and lets you refine the model result
   with additional context.
-- Selected text is used first, then plain clipboard text, as an editable default input.
+- Initial text resolves in this order: command argument, Raycast Fallback Text, selected text,
+  then plain clipboard text.
 - OpenAI, Anthropic, and OpenAI-compatible endpoints share one model interface. The extension
   never silently switches providers.
 
@@ -61,10 +62,12 @@ other services.
 
 ### Chat
 
-1. Run **Chat**.
-2. Review or edit the selected-text/clipboard default.
-3. Submit, then use **Follow Up**, **Retry Latest Answer**, **Copy**, **Paste**, or
-   **Stop Generating**.
+1. Find **Chat** in Raycast and enter an optional `Question` argument.
+2. Press Return to open the streaming Chat Thread directly.
+3. Use **Follow Up**, **Retry Latest Answer**, **Copy**, **Paste**, or **Stop Generating**.
+
+When the argument is empty, Chat uses Raycast Fallback Text, selected text, or clipboard text.
+If none is available, it shows a read-only input error instead of opening a second input form.
 
 The initial question is limited to 20,000 Unicode code points. Follow-ups and total conversation
 length are not artificially capped or summarized; the selected provider reports its own context
@@ -72,14 +75,16 @@ limit when exceeded.
 
 ### Translate
 
-1. Run **Translate**.
-2. Review the Source Text and choose a target language.
-3. Compare the model, Google, and Baidu results.
-4. Use **Refine Model Translation** to provide context or request another wording.
+1. Find **Translate** in Raycast and enter an optional `Source Text` argument.
+2. Optionally choose a `Target Language` argument; otherwise the global default is used.
+3. Press Return to open the results directly.
+4. Move between Model, Google, Baidu, and Source Text in the result list.
+5. Use **Refine Model Translation** to provide context or request another wording.
 
 Source Text and target language remain fixed during a translation session. A refinement updates
 only the model result; Google and Baidu stay as references to the original text. Start a new
-command to change the source or target. Source Text is limited to 5,000 Unicode code points.
+command to change the source or target. Model revision history is available from the Model
+Translation action panel. Source Text is limited to 5,000 Unicode code points.
 
 ## Privacy
 

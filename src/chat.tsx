@@ -5,6 +5,7 @@ import {
   Form,
   Icon,
   Keyboard,
+  LaunchProps,
   getPreferenceValues,
   openCommandPreferences,
   showToast,
@@ -13,11 +14,12 @@ import {
 } from "@raycast/api";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
+import { LaunchError } from "./components/launch-error";
 import { createChatSystemPrompt } from "./domain/prompts";
 import { resolveActiveModel, type ActiveModel, type Preferences } from "./domain/preferences";
-import { readDefaultInput } from "./lib/default-input";
+import { getLaunchInputError, type LaunchInput } from "./lib/launch-input";
+import { readLaunchInput } from "./lib/read-launch-input";
 import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
-import { unicodeLength } from "./lib/text-length";
 import { streamModelResponse } from "./services/model";
 
 const MAX_INITIAL_CHAT_LENGTH = 20_000;
@@ -247,90 +249,64 @@ function ChatThread({
   );
 }
 
-export default function ChatCommand() {
-  const { push } = useNavigation();
+type ChatLaunchProps = LaunchProps<{ arguments: Arguments.Chat }>;
+
+export default function ChatCommand(props: ChatLaunchProps) {
   const preferences = getPreferenceValues<Preferences>();
-  const [question, setQuestion] = useState("");
-  const didEditRef = useRef(false);
+  const [input, setInput] = useState<LaunchInput>();
   const [inputError, setInputError] = useState<string>();
-  const [activeModel, setActiveModel] = useState<ActiveModel>();
-  const [configurationError, setConfigurationError] = useState<string>();
+  const [isResolvingInput, setIsResolvingInput] = useState(true);
 
   useEffect(() => {
-    try {
-      setActiveModel(resolveActiveModel(preferences));
-    } catch (error) {
-      setConfigurationError(getSafeErrorMessage(error));
-    }
-  }, [preferences]);
-
-  useEffect(() => {
-    void readDefaultInput().then((text) => {
-      if (!didEditRef.current) setQuestion(text);
-    });
-  }, []);
-
-  function submit() {
-    const trimmedQuestion = question.trim();
-    if (!trimmedQuestion) {
-      setInputError("Enter a question or term.");
-      return;
-    }
-    if (unicodeLength(question) > MAX_INITIAL_CHAT_LENGTH) {
+    let isCancelled = false;
+    void readLaunchInput(props.arguments.question, props.fallbackText).then((resolvedInput) => {
+      if (isCancelled) return;
+      setInput(resolvedInput);
       setInputError(
-        `The initial question must be ${MAX_INITIAL_CHAT_LENGTH.toLocaleString()} characters or fewer.`,
+        getLaunchInputError(resolvedInput, MAX_INITIAL_CHAT_LENGTH, "The initial question"),
       );
-      return;
-    }
-    if (!activeModel) {
-      setInputError(configurationError || "Configure a model before starting Chat.");
-      return;
-    }
-    setInputError(undefined);
-    push(
-      <ChatThread
-        initialQuestion={trimmedQuestion}
-        preferences={preferences}
-        activeModel={activeModel}
-      />,
+      setIsResolvingInput(false);
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [props.arguments.question, props.fallbackText]);
+
+  if (isResolvingInput) {
+    return <Detail navigationTitle="Chat" markdown="# Chat\n\nResolving input…" isLoading />;
+  }
+
+  if (inputError || !input) {
+    return (
+      <LaunchError
+        title={inputError === "No Input Found" ? "No Input Found" : "Cannot Start Chat"}
+        message={
+          inputError === "No Input Found"
+            ? "Enter the first command argument, select text, or copy text before running Chat."
+            : inputError || "No input is available."
+        }
+      />
+    );
+  }
+
+  let activeModel: ActiveModel;
+  try {
+    activeModel = resolveActiveModel(preferences);
+  } catch (error) {
+    return (
+      <LaunchError
+        title="Model Not Configured"
+        message={getSafeErrorMessage(error)}
+        showPreferences
+      />
     );
   }
 
   return (
-    <Form
-      navigationTitle="Chat"
-      actions={
-        <ActionPanel>
-          <Action.SubmitForm title="Start Chat" icon={Icon.Message} onSubmit={submit} />
-          <Action
-            title="Open Command Preferences"
-            icon={Icon.Gear}
-            onAction={openCommandPreferences}
-          />
-        </ActionPanel>
-      }
-    >
-      <Form.TextArea
-        id="question"
-        title="Question"
-        placeholder="Ask a question, enter a term, or give an instruction"
-        value={question}
-        error={inputError}
-        onChange={(value) => {
-          didEditRef.current = true;
-          setQuestion(value);
-          if (inputError) setInputError(undefined);
-        }}
-        autoFocus
-      />
-      <Form.Description
-        title="Model"
-        text={
-          activeModel
-            ? `${activeModel.provider} · ${activeModel.model}`
-            : configurationError || "Not configured"
-        }
-      />
-    </Form>
+    <ChatThread
+      initialQuestion={input.text.trim()}
+      preferences={preferences}
+      activeModel={activeModel}
+    />
   );
 }

@@ -58,8 +58,16 @@ declare namespace Preferences {
 
 declare namespace Arguments {
   /** Arguments passed to the `chat` command */
-  export type Chat = {}
+  export type Chat = {
+  /** Question or term */
+  "question": string
+}
   /** Arguments passed to the `translate` command */
-  export type Translate = {}
+  export type Translate = {
+  /** Text to translate */
+  "sourceText": string,
+  /** Target language */
+  "targetLanguage": "zh-CN" | "zh-TW" | "en" | "ja" | "ko" | "fr" | "de" | "es" | "pt" | "it" | "ru" | "ar" | "th" | "vi" | "id" | "ms" | "hi"
+}
 }
 

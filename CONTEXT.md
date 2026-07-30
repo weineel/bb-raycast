@@ -45,5 +45,9 @@ An updated Model Translation and Translation Note produced from a follow-up mess
 _Avoid_: Version, retry result
 
 **Source Text**:
-The editable text submitted to Translate, optionally prefilled from the current selection or clipboard.
+The text submitted to Translate for a Translation Session, supplied explicitly or captured from the current selection or clipboard and fixed after launch.
 _Avoid_: Query, prompt, input text
+
+**Target Language**:
+The language into which Source Text is translated, fixed for the lifetime of a Translation Session.
+_Avoid_: Output language, destination language

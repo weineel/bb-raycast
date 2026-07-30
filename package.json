@@ -30,6 +30,14 @@
       "subtitle": "Benben AI",
       "description": "Ask a question, explain a term, and continue the conversation",
       "mode": "view",
+      "arguments": [
+        {
+          "name": "question",
+          "placeholder": "Question or term",
+          "type": "text",
+          "required": false
+        }
+      ],
       "preferences": [
         {
           "name": "providerOverride",
@@ -73,6 +81,90 @@
       "subtitle": "Benben AI",
       "description": "Compare AI, Google, and Baidu translations and refine the AI result",
       "mode": "view",
+      "arguments": [
+        {
+          "name": "sourceText",
+          "placeholder": "Text to translate",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "targetLanguage",
+          "placeholder": "Target language",
+          "type": "dropdown",
+          "required": false,
+          "data": [
+            {
+              "title": "Simplified Chinese",
+              "value": "zh-CN"
+            },
+            {
+              "title": "Traditional Chinese",
+              "value": "zh-TW"
+            },
+            {
+              "title": "English",
+              "value": "en"
+            },
+            {
+              "title": "Japanese",
+              "value": "ja"
+            },
+            {
+              "title": "Korean",
+              "value": "ko"
+            },
+            {
+              "title": "French",
+              "value": "fr"
+            },
+            {
+              "title": "German",
+              "value": "de"
+            },
+            {
+              "title": "Spanish",
+              "value": "es"
+            },
+            {
+              "title": "Portuguese",
+              "value": "pt"
+            },
+            {
+              "title": "Italian",
+              "value": "it"
+            },
+            {
+              "title": "Russian",
+              "value": "ru"
+            },
+            {
+              "title": "Arabic",
+              "value": "ar"
+            },
+            {
+              "title": "Thai",
+              "value": "th"
+            },
+            {
+              "title": "Vietnamese",
+              "value": "vi"
+            },
+            {
+              "title": "Indonesian",
+              "value": "id"
+            },
+            {
+              "title": "Malay",
+              "value": "ms"
+            },
+            {
+              "title": "Hindi",
+              "value": "hi"
+            }
+          ]
+        }
+      ],
       "preferences": [
         {
           "name": "providerOverride",
