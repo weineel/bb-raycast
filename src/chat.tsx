@@ -17,8 +17,7 @@ import type { ModelMessage } from "ai";
 import { LaunchError } from "./components/launch-error";
 import { createChatSystemPrompt } from "./domain/prompts";
 import { resolveActiveModel, type ActiveModel, type Preferences } from "./domain/preferences";
-import { getLaunchInputError, type LaunchInput } from "./lib/launch-input";
-import { readLaunchInput } from "./lib/read-launch-input";
+import { useLaunchInput } from "./hooks/use-launch-input";
 import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
 import { streamModelResponse } from "./services/model";
 
@@ -253,24 +252,16 @@ type ChatLaunchProps = LaunchProps<{ arguments: Arguments.Chat }>;
 
 export default function ChatCommand(props: ChatLaunchProps) {
   const preferences = getPreferenceValues<Preferences>();
-  const [input, setInput] = useState<LaunchInput>();
-  const [inputError, setInputError] = useState<string>();
-  const [isResolvingInput, setIsResolvingInput] = useState(true);
-
-  useEffect(() => {
-    let isCancelled = false;
-    void readLaunchInput(props.arguments.question, props.fallbackText).then((resolvedInput) => {
-      if (isCancelled) return;
-      setInput(resolvedInput);
-      setInputError(
-        getLaunchInputError(resolvedInput, MAX_INITIAL_CHAT_LENGTH, "The initial question"),
-      );
-      setIsResolvingInput(false);
-    });
-    return () => {
-      isCancelled = true;
-    };
-  }, [props.arguments.question, props.fallbackText]);
+  const {
+    input,
+    error: inputError,
+    isLoading: isResolvingInput,
+  } = useLaunchInput({
+    argumentText: props.arguments.question,
+    fallbackText: props.fallbackText,
+    maxLength: MAX_INITIAL_CHAT_LENGTH,
+    label: "The initial question",
+  });
 
   if (isResolvingInput) {
     return <Detail navigationTitle="Chat" markdown="# Chat\n\nResolving input…" isLoading />;

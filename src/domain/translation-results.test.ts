@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTranslationRows } from "./translation-results";
+import { createTranslationRows, translationResultMarkdown } from "./translation-results";
 
 describe("createTranslationRows", () => {
   it("keeps Model, Google, Baidu, and Source Text in a stable order", () => {
@@ -50,5 +50,30 @@ describe("createTranslationRows", () => {
         preview: "Original text",
       },
     ]);
+  });
+
+  it("keeps partial model output visible while translation is streaming", () => {
+    const rows = createTranslationRows({
+      model: { status: "loading", text: "## Translation\n\n**Partial** result" },
+      google: { status: "loading" },
+      baidu: { status: "loading" },
+      sourceText: "Original text",
+      revisionCount: 1,
+    });
+
+    expect(rows[0].preview).toBe("Translation Partial result");
+    expect(
+      translationResultMarkdown({
+        status: "loading",
+        text: "## Translation\n\n**Partial** result",
+      }),
+    ).toBe("## Translation\n\n**Partial** result");
+    expect(
+      translationResultMarkdown({
+        status: "error",
+        text: "Partial result",
+        error: "Generation stopped.",
+      }),
+    ).toContain("Partial result\n\n---\n\n# Request Failed");
   });
 });

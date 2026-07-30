@@ -21,13 +21,13 @@ import { getLanguage, type LanguageId } from "./domain/languages";
 import { createTranslationRequest, createTranslationSystemPrompt } from "./domain/prompts";
 import {
   createTranslationRows,
+  translationResultMarkdown,
   type TranslationResultState,
   type TranslationResultStatus,
   type TranslationRowId,
 } from "./domain/translation-results";
 import { resolveActiveModel, type ActiveModel, type Preferences } from "./domain/preferences";
-import { getLaunchInputError, type LaunchInput } from "./lib/launch-input";
-import { readLaunchInput } from "./lib/read-launch-input";
+import { useLaunchInput } from "./hooks/use-launch-input";
 import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
 import { translateWithBaidu } from "./services/baidu-translate";
 import { translateWithGoogle } from "./services/google-translate";
@@ -47,68 +47,31 @@ function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function statusLabel(status: TranslationResultStatus): string {
-  switch (status) {
-    case "loading":
-      return "Translating";
-    case "success":
-      return "Ready";
-    case "error":
-      return "Failed";
-    case "unconfigured":
-      return "Not Configured";
-  }
-}
-
-function statusColor(status: TranslationResultStatus): Color {
-  switch (status) {
-    case "loading":
-      return Color.Orange;
-    case "success":
-      return Color.Green;
-    case "error":
-      return Color.Red;
-    case "unconfigured":
-      return Color.SecondaryText;
-  }
-}
-
-function statusIcon(status: TranslationResultStatus): Icon {
-  switch (status) {
-    case "loading":
-      return Icon.CircleProgress;
-    case "success":
-      return Icon.CheckCircle;
-    case "error":
-      return Icon.XMarkCircle;
-    case "unconfigured":
-      return Icon.Gear;
-  }
-}
-
-function resultMarkdown(result: TranslationResultState): string {
-  switch (result.status) {
-    case "loading":
-      return "_Translating…_";
-    case "success":
-      return result.text || "_No translation returned._";
-    case "error":
-      return `# Request Failed\n\n> ${result.error || "The request failed."}`;
-    case "unconfigured":
-      return `# Not Configured\n\n${result.error || "Open Command Preferences to configure this service."}`;
-  }
-}
+const STATUS_PRESENTATION: Record<
+  TranslationResultStatus,
+  { label: string; color: Color; icon: Icon }
+> = {
+  loading: { label: "Translating", color: Color.Orange, icon: Icon.CircleProgress },
+  success: { label: "Ready", color: Color.Green, icon: Icon.CheckCircle },
+  error: { label: "Failed", color: Color.Red, icon: Icon.XMarkCircle },
+  unconfigured: {
+    label: "Not Configured",
+    color: Color.SecondaryText,
+    icon: Icon.Gear,
+  },
+};
 
 function resultMetadata(
   status: TranslationResultStatus,
   targetLanguage: LanguageId,
   extra?: React.ReactNode,
 ) {
+  const presentation = STATUS_PRESENTATION[status];
   return (
     <List.Item.Detail.Metadata>
       <List.Item.Detail.Metadata.Label
         title="Status"
-        text={{ value: statusLabel(status), color: statusColor(status) }}
+        text={{ value: presentation.label, color: presentation.color }}
       />
       <List.Item.Detail.Metadata.Label
         title="Target Language"
@@ -162,7 +125,7 @@ function FollowUpForm({ onSubmit }: { onSubmit: (instruction: string) => void })
   );
 }
 
-function RevisionHistory({
+function TranslationRevisions({
   revisions,
   targetLanguage,
   activeModel,
@@ -172,10 +135,11 @@ function RevisionHistory({
   activeModel: ActiveModel;
 }) {
   return (
-    <List navigationTitle="Revision History" isShowingDetail>
+    <List navigationTitle="Translation Revisions" isShowingDetail>
       {revisions.map((revision, index) => {
         const revisionNumber = revisions.length - index;
         const result: TranslationResultState = revision;
+        const presentation = STATUS_PRESENTATION[revision.status];
         return (
           <List.Item
             key={revision.id}
@@ -183,20 +147,20 @@ function RevisionHistory({
             title={`Revision ${revisionNumber}`}
             subtitle={revision.instruction || "Initial translation"}
             icon={{
-              source: statusIcon(revision.status),
-              tintColor: statusColor(revision.status),
+              source: presentation.icon,
+              tintColor: presentation.color,
             }}
             accessories={[
               {
                 tag: {
-                  value: statusLabel(revision.status),
-                  color: statusColor(revision.status),
+                  value: presentation.label,
+                  color: presentation.color,
                 },
               },
             ]}
             detail={
               <List.Item.Detail
-                markdown={resultMarkdown(result)}
+                markdown={translationResultMarkdown(result)}
                 metadata={resultMetadata(
                   revision.status,
                   targetLanguage,
@@ -405,6 +369,7 @@ function TranslateResult({
     revisionCount: revisions.length,
   });
   const isLoading = rows.some((row) => row.status === "loading");
+  const sourcePresentation = STATUS_PRESENTATION[rows[3].status];
 
   function modelActions() {
     const modelIsLoading = model.status === "loading";
@@ -449,11 +414,11 @@ function TranslateResult({
         ) : null}
         {revisions.length > 1 && activeModel ? (
           <Action
-            title="View Revision History"
+            title="View Translation Revisions"
             icon={Icon.Clock}
             onAction={() =>
               push(
-                <RevisionHistory
+                <TranslationRevisions
                   revisions={revisions}
                   targetLanguage={targetLanguage}
                   activeModel={activeModel}
@@ -496,7 +461,7 @@ function TranslateResult({
             <Action.Paste title={`Paste ${title}`} content={result.text} />
           </>
         ) : null}
-        {result.status === "error" ? (
+        {result.status === "success" || result.status === "error" ? (
           <Action
             title={`Retry ${title}`}
             icon={Icon.RotateClockwise}
@@ -530,6 +495,7 @@ function TranslateResult({
         {rows.slice(0, 3).map((row) => {
           const result = row.id === "model" ? model : row.id === "google" ? google : baidu;
           const isModel = row.id === "model";
+          const presentation = STATUS_PRESENTATION[row.status];
           const icon =
             row.id === "model" ? Icon.Stars : row.id === "google" ? Icon.Globe : Icon.SpeechBubble;
           const tintColor =
@@ -552,15 +518,15 @@ function TranslateResult({
                 ...(row.revisionLabel ? [{ text: row.revisionLabel }] : []),
                 {
                   tag: {
-                    value: statusLabel(row.status),
-                    color: statusColor(row.status),
+                    value: presentation.label,
+                    color: presentation.color,
                   },
-                  icon: statusIcon(row.status),
+                  icon: presentation.icon,
                 },
               ]}
               detail={
                 <List.Item.Detail
-                  markdown={resultMarkdown(result)}
+                  markdown={translationResultMarkdown(result)}
                   metadata={resultMetadata(
                     result.status,
                     targetLanguage,
@@ -591,7 +557,16 @@ function TranslateResult({
           title="Source Text"
           subtitle={rows[3].preview}
           icon={{ source: Icon.Document, tintColor: Color.SecondaryText }}
-          accessories={[{ text: `${Array.from(sourceText).length.toLocaleString()} characters` }]}
+          accessories={[
+            { text: `${Array.from(sourceText).length.toLocaleString()} characters` },
+            {
+              tag: {
+                value: sourcePresentation.label,
+                color: sourcePresentation.color,
+              },
+              icon: sourcePresentation.icon,
+            },
+          ]}
           detail={
             <List.Item.Detail
               markdown={`# Source Text\n\n${sourceText}`}
@@ -624,22 +599,16 @@ type TranslateLaunchProps = LaunchProps<{ arguments: Arguments.Translate }>;
 
 export default function TranslateCommand(props: TranslateLaunchProps) {
   const preferences = getPreferenceValues<Preferences>();
-  const [input, setInput] = useState<LaunchInput>();
-  const [inputError, setInputError] = useState<string>();
-  const [isResolvingInput, setIsResolvingInput] = useState(true);
-
-  useEffect(() => {
-    let isCancelled = false;
-    void readLaunchInput(props.arguments.sourceText, props.fallbackText).then((resolvedInput) => {
-      if (isCancelled) return;
-      setInput(resolvedInput);
-      setInputError(getLaunchInputError(resolvedInput, MAX_SOURCE_LENGTH, "Source Text"));
-      setIsResolvingInput(false);
-    });
-    return () => {
-      isCancelled = true;
-    };
-  }, [props.arguments.sourceText, props.fallbackText]);
+  const {
+    input,
+    error: inputError,
+    isLoading: isResolvingInput,
+  } = useLaunchInput({
+    argumentText: props.arguments.sourceText,
+    fallbackText: props.fallbackText,
+    maxLength: MAX_SOURCE_LENGTH,
+    label: "Source Text",
+  });
 
   if (isResolvingInput) {
     return (

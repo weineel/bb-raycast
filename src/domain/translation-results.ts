@@ -29,13 +29,28 @@ function createPreview(value: string | undefined): string {
 function resultPreview(result: TranslationResultState): string {
   switch (result.status) {
     case "loading":
-      return "Translating…";
+      return createPreview(result.text) || "Translating…";
     case "success":
       return createPreview(result.text) || "Ready";
     case "error":
-      return createPreview(result.error) || "Request failed";
+      return createPreview(result.text) || createPreview(result.error) || "Request failed";
     case "unconfigured":
       return createPreview(result.error) || "Not configured";
+  }
+}
+
+export function translationResultMarkdown(result: TranslationResultState): string {
+  switch (result.status) {
+    case "loading":
+      return result.text || "_Translating…_";
+    case "success":
+      return result.text || "_No translation returned._";
+    case "error": {
+      const error = `# Request Failed\n\n> ${result.error || "The request failed."}`;
+      return result.text ? `${result.text}\n\n---\n\n${error}` : error;
+    }
+    case "unconfigured":
+      return `# Not Configured\n\n${result.error || "Open Command Preferences to configure this service."}`;
   }
 }
 

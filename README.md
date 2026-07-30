@@ -83,7 +83,7 @@ limit when exceeded.
 
 Source Text and target language remain fixed during a translation session. A refinement updates
 only the model result; Google and Baidu stay as references to the original text. Start a new
-command to change the source or target. Model revision history is available from the Model
+command to change the source or target. Translation Revisions are available from the Model
 Translation action panel. Source Text is limited to 5,000 Unicode code points.
 
 ## Privacy

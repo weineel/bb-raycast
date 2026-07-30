@@ -8,4 +8,4 @@
 - Added selected-text and clipboard capture, streaming, stop, retry, copy, and paste actions.
 - Added Root Search arguments that launch Chat and Translate directly without an initial form.
 - Added a stable List + Detail translation result view with service status, previews, Source Text,
-  and separate model revision history.
+  and separate Translation Revisions.
