@@ -1,103 +1,92 @@
 # Benben AI
 
-Benben AI is a macOS Raycast extension for private, bring-your-own-key AI chat and
-translation.
+中 | [英](README.en.md)
 
-- **Chat** explains bare terms, answers questions, and supports follow-up messages in the
-  current Raycast window.
-- **Translate** streams a professional model translation with a brief explanation, shows
-  independent Google and Baidu reference translations, and lets you refine the model result
-  with additional context.
-- Initial text resolves in this order: command argument, Raycast Fallback Text, selected text,
-  then plain clipboard text.
-- OpenAI, Anthropic, and OpenAI-compatible endpoints share one model interface. The extension
-  never silently switches providers.
+Benben AI 是一款 macOS Raycast 扩展，提供注重隐私的自带密钥（BYOK）AI 对话和翻译功能。
 
-## Setup
+- **Chat** 可以解释词语、回答问题，并支持在当前 Raycast 窗口中继续追问。
+- **Translate** 会流式生成专业的模型译文和简要说明，同时显示独立的 Google、百度参考译文，
+  还可以根据补充上下文继续优化模型译文。
+- 初始文本按以下顺序读取：命令参数、Raycast Fallback Text、选中文本、纯文本剪贴板内容。
+- OpenAI、Anthropic 和 OpenAI 兼容端点共用统一的模型接口；扩展不会静默切换服务商。
 
-Open either command's preferences in Raycast.
+## 配置
 
-### Model provider
+在 Raycast 中打开任一命令的偏好设置。
 
-Choose a global default provider and model. Chat and Translate can optionally override both.
+### 模型服务商
 
-- **OpenAI:** Create an API key at
-  [platform.openai.com/api-keys](https://platform.openai.com/api-keys), then add it to
-  `OpenAI API Key`.
-- **Anthropic:** Create an API key in the
-  [Anthropic Console](https://console.anthropic.com/settings/keys), then add it to
-  `Anthropic API Key`.
-- **OpenAI-Compatible:** Enter the provider's Base URL, API key, and exact Model ID.
+选择全局默认的服务商和模型。Chat 与 Translate 均可单独覆盖这两项设置。
 
-The initial model IDs are suggestions and remain fully configurable because model availability
-depends on your provider account.
+- **OpenAI：**前往 [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+  创建 API 密钥，然后将其填入 `OpenAI API Key`。
+- **Anthropic：**前往 [Anthropic Console](https://console.anthropic.com/settings/keys)
+  创建 API 密钥，然后将其填入 `Anthropic API Key`。
+- **OpenAI-Compatible：**填写服务商的 Base URL、API 密钥以及准确的 Model ID。
 
-### Google reference translation
+预置的 Model ID 仅供参考。不同账号可用的模型可能不同，因此所有 Model ID 均可配置。
 
-Google is optional. Benben AI uses the official Cloud Translation Basic v2 API and does not call
-an unofficial free endpoint.
+### Google 参考翻译
 
-1. Create or select a project in [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable **Cloud Translation API** for that project.
-3. Open **APIs & Services → Credentials**, create an API key, and restrict it to the Cloud
-   Translation API where possible.
-4. Add the key to `Google Cloud Translation API Key`.
+Google 翻译为可选功能。Benben AI 使用官方 Cloud Translation Basic v2 API，不会调用非官方
+免费端点。
 
-If the key is empty, the Google section shows a configuration message while model and Baidu
-translation continue normally.
+1. 在 [Google Cloud Console](https://console.cloud.google.com/) 中创建或选择一个项目。
+2. 为该项目启用 **Cloud Translation API**。
+3. 打开 **APIs & Services → Credentials**，创建 API 密钥，并尽可能将其限制为仅能访问
+   Cloud Translation API。
+4. 将密钥填入 `Google Cloud Translation API Key`。
 
-### Baidu reference translation
+如果密钥为空，Google 区域会显示配置提示，模型翻译和百度翻译仍可正常运行。
 
-Baidu is optional and uses the official General Text Translation API.
+### 百度参考翻译
 
-1. Register an application in the
-   [Baidu Translate Open Platform](https://fanyi-api.baidu.com/).
-2. Copy the application's **APP ID** and **Secret Key**.
-3. Add both values to the matching Benben AI preferences.
+百度翻译为可选功能，使用官方通用文本翻译 API。
 
-If either value is empty, the Baidu section shows a configuration message without affecting the
-other services.
+1. 在[百度翻译开放平台](https://fanyi-api.baidu.com/)注册应用。
+2. 复制应用的 **APP ID** 和**密钥**。
+3. 将两项内容填入 Benben AI 对应的偏好设置。
 
-## Usage
+如果任一项为空，百度区域会显示配置提示，不影响其他服务。
+
+## 使用方法
 
 ### Chat
 
-1. Find **Chat** in Raycast and enter an optional `Question` argument.
-2. Press Return to open the streaming Chat Thread directly.
-3. Use **Follow Up**, **Retry Latest Answer**, **Copy**, **Paste**, or **Stop Generating**.
+1. 在 Raycast 中找到 **Chat**，按需填写 `Question` 参数。
+2. 按下 Return，直接打开流式 Chat Thread。
+3. 使用 **Follow Up**、**Retry Latest Answer**、**Copy**、**Paste** 或
+   **Stop Generating** 操作。
 
-When the argument is empty, Chat uses Raycast Fallback Text, selected text, or clipboard text.
-If none is available, it shows a read-only input error instead of opening a second input form.
+参数为空时，Chat 会依次尝试使用 Raycast Fallback Text、选中文本或剪贴板文本。如果均不可用，
+扩展会显示只读的输入错误，而不会再打开一个输入表单。
 
-The initial question is limited to 20,000 Unicode code points. Follow-ups and total conversation
-length are not artificially capped or summarized; the selected provider reports its own context
-limit when exceeded.
+初始问题最多可包含 20,000 个 Unicode 码点。扩展不会人为限制或自动总结追问及完整对话；如果超出
+上下文限制，将由所选服务商返回错误。
 
 ### Translate
 
-1. Find **Translate** in Raycast and enter an optional `Source Text` argument.
-2. Optionally choose a `Target Language` argument; otherwise the global default is used.
-3. Press Return to open the results directly.
-4. Move between Model, Google, Baidu, and Source Text in the result list.
-5. Use **Refine Model Translation** to provide context or request another wording.
+1. 在 Raycast 中找到 **Translate**，按需填写 `Source Text` 参数。
+2. 可选择 `Target Language` 参数；未选择时使用全局默认语言。
+3. 按下 Return，直接打开翻译结果。
+4. 在结果列表中切换查看 Model、Google、Baidu 和 Source Text。
+5. 使用 **Refine Model Translation** 补充上下文或要求改写译文。
 
-Source Text and target language remain fixed during a translation session. A refinement updates
-only the model result; Google and Baidu stay as references to the original text. Start a new
-command to change the source or target. Translation Revisions are available from the Model
-Translation action panel. Source Text is limited to 5,000 Unicode code points.
+在一次翻译会话中，Source Text 和目标语言保持不变。优化操作只会更新模型译文；Google 和百度结果
+始终作为原文的参考译文。若要更改原文或目标语言，请重新运行命令。可以从 Model Translation 的操作
+面板查看 Translation Revisions。Source Text 最多可包含 5,000 个 Unicode 码点。
 
-## Privacy
+## 隐私
 
-- Requests go directly from Raycast to the provider configured for that section.
-- API credentials remain in Raycast preferences.
-- Benben AI has no backend, analytics, or persistent conversation history.
-- Prompts, Source Text, responses, and API keys are not logged by the extension.
-- Closing the command clears its in-memory Chat Thread or Translation Session.
+- 请求会从 Raycast 直接发送到对应区域所配置的服务商。
+- API 凭据保存在 Raycast 偏好设置中。
+- Benben AI 没有后端、分析统计或持久化对话历史。
+- 扩展不会记录提示词、Source Text、响应或 API 密钥。
+- 关闭命令后，内存中的 Chat Thread 或 Translation Session 会被清除。
 
-Your selected providers may process or retain requests according to their own terms and privacy
-policies.
+所选服务商可能会根据其自身条款和隐私政策处理或保留请求。
 
-## Development
+## 开发
 
 ```bash
 pnpm install
@@ -106,5 +95,5 @@ pnpm lint
 pnpm build
 ```
 
-The `author` field in `package.json` must be replaced with the publisher's Raycast Store handle
-before submission.
+提交到 Raycast Store 前，必须将 `package.json` 中的 `author` 字段替换为发布者的 Raycast Store
+账号名。
