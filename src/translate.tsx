@@ -14,7 +14,7 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
 import { LaunchError } from "./components/launch-error";
 import { getLanguage, type LanguageId } from "./domain/languages";
@@ -27,6 +27,7 @@ import {
   type TranslationRowId,
 } from "./domain/translation-results";
 import { resolveActiveModel, type ActiveModel, type Preferences } from "./domain/preferences";
+import { useInitialRequest } from "./hooks/use-initial-request";
 import { useLaunchInput } from "./hooks/use-launch-input";
 import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
 import { translateWithBaidu } from "./services/baidu-translate";
@@ -194,7 +195,7 @@ function TranslationRevisions({
   );
 }
 
-function TranslateResult({
+export function TranslateResult({
   sourceText,
   targetLanguage,
   preferences,
@@ -218,7 +219,6 @@ function TranslateResult({
   const modelAbortRef = useRef<AbortController | undefined>(undefined);
   const googleAbortRef = useRef<AbortController | undefined>(undefined);
   const baiduAbortRef = useRef<AbortController | undefined>(undefined);
-  const didStartRef = useRef(false);
   const systemPrompt = useMemo(
     () => createTranslationSystemPrompt(targetLanguage),
     [targetLanguage],
@@ -335,22 +335,18 @@ function TranslateResult({
     }
   }, [preferences.baiduAppId, preferences.baiduSecretKey, sourceText, targetLanguage]);
 
-  useEffect(() => {
-    if (didStartRef.current) return;
-    didStartRef.current = true;
+  const startInitialRequests = useCallback(() => {
     if (activeModel) void runModel();
     void runGoogle();
     void runBaidu();
   }, [activeModel, runBaidu, runGoogle, runModel]);
 
-  useEffect(
-    () => () => {
-      modelAbortRef.current?.abort();
-      googleAbortRef.current?.abort();
-      baiduAbortRef.current?.abort();
-    },
-    [],
-  );
+  const stopRequests = useCallback(() => {
+    modelAbortRef.current?.abort();
+    googleAbortRef.current?.abort();
+    baiduAbortRef.current?.abort();
+  }, []);
+  useInitialRequest(startInitialRequests, stopRequests);
 
   const latestRevision = revisions[0];
   const model: TranslationResultState = latestRevision

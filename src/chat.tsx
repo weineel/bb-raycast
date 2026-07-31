@@ -12,11 +12,12 @@ import {
   Toast,
   useNavigation,
 } from "@raycast/api";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
 import { LaunchError } from "./components/launch-error";
 import { createChatSystemPrompt } from "./domain/prompts";
 import { resolveActiveModel, type ActiveModel, type Preferences } from "./domain/preferences";
+import { useInitialRequest } from "./hooks/use-initial-request";
 import { useLaunchInput } from "./hooks/use-launch-input";
 import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
 import { streamModelResponse } from "./services/model";
@@ -95,7 +96,7 @@ function FollowUpForm({ onSubmit }: { onSubmit: (text: string) => void }) {
   );
 }
 
-function ChatThread({
+export function ChatThread({
   initialQuestion,
   preferences,
   activeModel,
@@ -111,7 +112,6 @@ function ChatThread({
   const [isLoading, setIsLoading] = useState(false);
   const entriesRef = useRef<ChatEntry[]>([]);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
-  const didStartRef = useRef(false);
   const systemPrompt = useMemo(
     () => createChatSystemPrompt(preferences.defaultAnswerLanguage),
     [preferences.defaultAnswerLanguage],
@@ -183,9 +183,7 @@ function ChatThread({
     void generate(history);
   }, [generate, isLoading, updateEntries]);
 
-  useEffect(() => {
-    if (didStartRef.current) return;
-    didStartRef.current = true;
+  const startInitialRequest = useCallback(() => {
     const initialEntries: ChatEntry[] = [
       { id: createId(), role: "user", content: initialQuestion },
     ];
@@ -193,7 +191,8 @@ function ChatThread({
     void generate(initialEntries);
   }, [generate, initialQuestion, updateEntries]);
 
-  useEffect(() => () => abortControllerRef.current?.abort(), []);
+  const stopRequest = useCallback(() => abortControllerRef.current?.abort(), []);
+  useInitialRequest(startInitialRequest, stopRequest);
 
   const latestAnswer = latestAssistantText(entries);
   const markdown = renderTranscript(entries, streamingText, error);

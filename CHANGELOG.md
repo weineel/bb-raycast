@@ -9,3 +9,4 @@
 - Added Root Search arguments that launch Chat and Translate directly without an initial form.
 - Added a stable List + Detail translation result view with service status, previews, Source Text,
   and separate Translation Revisions.
+- Fixed initial Chat and Translate requests being canceled during React effect replay.
