@@ -15,8 +15,17 @@ const requestStats = vi.hoisted(() => ({
   baiduCompleted: 0,
 }));
 
+const raycast = vi.hoisted(() => ({
+  getPreferenceValues: vi.fn(),
+}));
+
+const renderStats = vi.hoisted(() => ({
+  sourceTexts: [] as string[],
+}));
+
 vi.mock("@raycast/api", () => {
   const Component = () => null;
+  const Container = ({ children }: { children?: React.ReactNode }) => children ?? null;
   const Action = Object.assign(Component, {
     CopyToClipboard: Component,
     Paste: Component,
@@ -30,13 +39,17 @@ vi.mock("@raycast/api", () => {
     Description: Component,
     TextArea: Component,
   });
-  const List = Object.assign(Component, {
-    Item: Object.assign(Component, {
+  const ListItem = ({ id, subtitle }: { id?: string; subtitle?: string }) => {
+    if (id === "source" && subtitle) renderStats.sourceTexts.push(subtitle);
+    return null;
+  };
+  const List = Object.assign(Container, {
+    Item: Object.assign(ListItem, {
       Detail: Object.assign(Component, {
         Metadata: Object.assign(Component, { Label: Component }),
       }),
     }),
-    Section: Component,
+    Section: Container,
   });
 
   return {
@@ -56,7 +69,7 @@ vi.mock("@raycast/api", () => {
     Keyboard: { Shortcut: { Common: { Copy: {}, Refresh: {} } } },
     List,
     Toast: { Style: { Failure: "failure" } },
-    getPreferenceValues: vi.fn(),
+    getPreferenceValues: raycast.getPreferenceValues,
     openCommandPreferences: vi.fn(),
     showToast: vi.fn(),
     useNavigation: () => ({ pop: vi.fn(), push: vi.fn() }),
@@ -123,7 +136,7 @@ vi.mock("./services/baidu-translate", () => ({
 }));
 
 import { ChatThread } from "./chat";
-import { TranslateResult } from "./translate";
+import TranslateCommand, { TranslateResult } from "./translate";
 
 const activeModel: ActiveModel = { provider: "openai", model: "test-model" };
 const preferences: Preferences = {
@@ -150,9 +163,22 @@ async function renderStrictMode(element: React.ReactElement): Promise<ReactTestR
   return renderer!;
 }
 
+function translateCommandProps(
+  translationSessionId: string,
+  sourceText = "hello",
+): Parameters<typeof TranslateCommand>[0] {
+  return {
+    arguments: { sourceText, targetLanguage: "zh-CN" },
+    launchContext: { translationSessionId },
+    launchType: "userInitiated" as never,
+  };
+}
+
 describe("initial requests", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    raycast.getPreferenceValues.mockReturnValue(preferences);
+    renderStats.sourceTexts.length = 0;
     Object.assign(requestStats, {
       modelStarted: 0,
       modelCompleted: 0,
@@ -189,6 +215,51 @@ describe("initial requests", () => {
     expect(requestStats.googleCompleted).toBe(1);
     expect(requestStats.baiduStarted).toBe(1);
     expect(requestStats.baiduCompleted).toBe(1);
+    renderer.unmount();
+  });
+
+  it("starts a new Translation Session when the launch context changes", async () => {
+    const renderer = await renderStrictMode(
+      <TranslateCommand {...translateCommandProps("session-1")} />,
+    );
+
+    expect(requestStats.modelStarted).toBe(1);
+    expect(requestStats.googleStarted).toBe(1);
+    expect(requestStats.baiduStarted).toBe(1);
+
+    await act(async () => {
+      renderer.update(
+        <StrictMode>
+          <TranslateCommand {...translateCommandProps("session-2")} />
+        </StrictMode>,
+      );
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(requestStats.modelStarted).toBe(2);
+    expect(requestStats.googleStarted).toBe(2);
+    expect(requestStats.baiduStarted).toBe(2);
+    renderer.unmount();
+  });
+
+  it("renders the new Source Text without flashing the previous Session input", async () => {
+    const renderer = await renderStrictMode(
+      <TranslateCommand {...translateCommandProps("session-1", "previous source")} />,
+    );
+    renderStats.sourceTexts.length = 0;
+
+    await act(async () => {
+      renderer.update(
+        <StrictMode>
+          <TranslateCommand {...translateCommandProps("session-2", "current source")} />
+        </StrictMode>,
+      );
+    });
+
+    expect(renderStats.sourceTexts).toContain("current source");
+    expect(renderStats.sourceTexts).not.toContain("previous source");
     renderer.unmount();
   });
 });

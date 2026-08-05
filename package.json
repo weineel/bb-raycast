@@ -76,6 +76,13 @@
       ]
     },
     {
+      "name": "quick-translate",
+      "title": "Quick Translate",
+      "subtitle": "Benben AI",
+      "description": "Translate selected or copied text in a fresh session",
+      "mode": "no-view"
+    },
+    {
       "name": "translate",
       "title": "Translate",
       "subtitle": "Benben AI",

@@ -5,9 +5,11 @@
 Benben AI 是一款 macOS Raycast 扩展，提供注重隐私的自带密钥（BYOK）AI 对话和翻译功能。
 
 - **Chat** 可以解释词语、回答问题，并支持在当前 Raycast 窗口中继续追问。
+- **Quick Translate** 每次运行都会重新读取选中文本或剪贴板内容并开始新的翻译会话，适合绑定
+  全局快捷键。
 - **Translate** 会流式生成专业的模型译文和简要说明，同时显示独立的 Google、百度参考译文，
   还可以根据补充上下文继续优化模型译文。
-- 初始文本按以下顺序读取：命令参数、Raycast Fallback Text、选中文本、纯文本剪贴板内容。
+- 初始文本按以下顺序读取：命令参数、选中文本、纯文本剪贴板内容、Raycast Fallback Text。
 - OpenAI、Anthropic 和 OpenAI 兼容端点共用统一的模型接口；扩展不会静默切换服务商。
 
 ## 配置
@@ -58,11 +60,21 @@ Google 翻译为可选功能。Benben AI 使用官方 Cloud Translation Basic v2
 3. 使用 **Follow Up**、**Retry Latest Answer**、**Copy**、**Paste** 或
    **Stop Generating** 操作。
 
-参数为空时，Chat 会依次尝试使用 Raycast Fallback Text、选中文本或剪贴板文本。如果均不可用，
+参数为空时，Chat 会依次尝试使用选中文本、剪贴板文本或 Raycast Fallback Text。如果均不可用，
 扩展会显示只读的输入错误，而不会再打开一个输入表单。
 
 初始问题最多可包含 20,000 个 Unicode 码点。扩展不会人为限制或自动总结追问及完整对话；如果超出
 上下文限制，将由所选服务商返回错误。
+
+### Quick Translate
+
+1. 在 Raycast 中为 **Quick Translate** 绑定全局快捷键。
+2. 在任意应用中选中文本；没有选中文本时，也可以先复制纯文本。
+3. 按下快捷键，直接打开使用 `Default Translation Target` 的全新翻译会话。
+
+每次运行 Quick Translate 都会重新读取文本并发起翻译，即使原文与上次相同。若选中文本与剪贴板
+内容不同，优先翻译选中文本。没有可用文本时只显示 HUD，不打开结果页。请勿把连续捕获所用的
+全局快捷键绑定到 **Translate**，因为 Raycast 可能恢复该命令仍挂载的旧结果页。
 
 ### Translate
 

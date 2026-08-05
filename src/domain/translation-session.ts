@@ -1,0 +1,1 @@
+export const MAX_SOURCE_TEXT_LENGTH = 5_000;

@@ -5,7 +5,7 @@ export async function readLaunchInput(
   argumentText?: string,
   fallbackText?: string,
 ): Promise<LaunchInput | undefined> {
-  const explicitInput = resolveLaunchInput({ argumentText, fallbackText });
+  const explicitInput = resolveLaunchInput({ argumentText });
   if (explicitInput) {
     return explicitInput;
   }
@@ -28,5 +28,5 @@ export async function readLaunchInput(
   } catch {
     // Clipboard access can fail when macOS permissions or the current payload do not allow it.
   }
-  return resolveLaunchInput({ clipboardText });
+  return resolveLaunchInput({ clipboardText, fallbackText });
 }

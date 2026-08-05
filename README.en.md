@@ -7,11 +7,13 @@ translation.
 
 - **Chat** explains bare terms, answers questions, and supports follow-up messages in the
   current Raycast window.
+- **Quick Translate** captures selected or copied text again on every run and starts a fresh
+  Translation Session, making it the recommended command for a global hotkey.
 - **Translate** streams a professional model translation with a brief explanation, shows
   independent Google and Baidu reference translations, and lets you refine the model result
   with additional context.
-- Initial text resolves in this order: command argument, Raycast Fallback Text, selected text,
-  then plain clipboard text.
+- Initial text resolves in this order: command argument, selected text, plain clipboard text,
+  then Raycast Fallback Text.
 - OpenAI, Anthropic, and OpenAI-compatible endpoints share one model interface. The extension
   never silently switches providers.
 
@@ -68,12 +70,23 @@ other services.
 2. Press Return to open the streaming Chat Thread directly.
 3. Use **Follow Up**, **Retry Latest Answer**, **Copy**, **Paste**, or **Stop Generating**.
 
-When the argument is empty, Chat uses Raycast Fallback Text, selected text, or clipboard text.
+When the argument is empty, Chat uses selected text, clipboard text, or Raycast Fallback Text.
 If none is available, it shows a read-only input error instead of opening a second input form.
 
 The initial question is limited to 20,000 Unicode code points. Follow-ups and total conversation
 length are not artificially capped or summarized; the selected provider reports its own context
 limit when exceeded.
+
+### Quick Translate
+
+1. Assign a global hotkey to **Quick Translate** in Raycast.
+2. Select text in any application, or copy plain text when there is no selection.
+3. Press the hotkey to open a fresh Translation Session using `Default Translation Target`.
+
+Quick Translate captures text and sends new translation requests on every run, even when the
+Source Text is unchanged. Selected text wins when it differs from clipboard text. With no text
+available, the command only shows a HUD and does not open the results. Do not assign the repeated
+capture hotkey to **Translate**, because Raycast can restore that command's mounted results view.
 
 ### Translate
 

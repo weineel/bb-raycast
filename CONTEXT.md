@@ -40,6 +40,10 @@ _Avoid_: Keyword, short query, entity
 A translation interaction with fixed Source Text and Target Language, its Model Translation and available reference translations, and follow-up messages used to refine the Model Translation.
 _Avoid_: Translation history, translation thread
 
+**Quick Translate**:
+A user-invoked translation entry point that captures available text and begins a fresh Translation Session using the default Target Language.
+_Avoid_: Translate Selection, Instant Translate
+
 **Translation Revision**:
 An updated Model Translation and Translation Note produced from a follow-up message and retained within the current Translation Session.
 _Avoid_: Version, retry result

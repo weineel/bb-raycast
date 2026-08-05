@@ -13,14 +13,14 @@ describe("resolveLaunchInput", () => {
     ).toEqual({ text: "typed question", source: "argument" });
   });
 
-  it("uses Raycast Fallback Text before selection and clipboard text", () => {
+  it("uses selected text before Raycast Fallback Text", () => {
     expect(
       resolveLaunchInput({
         fallbackText: "fallback question",
         selectedText: "selected question",
         clipboardText: "clipboard question",
       }),
-    ).toEqual({ text: "fallback question", source: "fallback" });
+    ).toEqual({ text: "selected question", source: "selection" });
   });
 
   it("uses selected text before clipboard text", () => {
@@ -30,6 +30,15 @@ describe("resolveLaunchInput", () => {
         clipboardText: "clipboard question",
       }),
     ).toEqual({ text: "selected question", source: "selection" });
+  });
+
+  it("uses clipboard text before Raycast Fallback Text", () => {
+    expect(
+      resolveLaunchInput({
+        fallbackText: "fallback question",
+        clipboardText: "clipboard question",
+      }),
+    ).toEqual({ text: "clipboard question", source: "clipboard" });
   });
 
   it("ignores blank higher-priority values and uses clipboard text", () => {

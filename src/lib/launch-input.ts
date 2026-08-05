@@ -16,14 +16,14 @@ export function resolveLaunchInput(candidates: LaunchInputCandidates): LaunchInp
   if (candidates.argumentText?.trim()) {
     return { text: candidates.argumentText, source: "argument" };
   }
-  if (candidates.fallbackText?.trim()) {
-    return { text: candidates.fallbackText, source: "fallback" };
-  }
   if (candidates.selectedText?.trim()) {
     return { text: candidates.selectedText, source: "selection" };
   }
   if (candidates.clipboardText?.trim()) {
     return { text: candidates.clipboardText, source: "clipboard" };
+  }
+  if (candidates.fallbackText?.trim()) {
+    return { text: candidates.fallbackText, source: "fallback" };
   }
   return undefined;
 }

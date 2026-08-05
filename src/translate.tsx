@@ -19,6 +19,7 @@ import type { ModelMessage } from "ai";
 import { LaunchError } from "./components/launch-error";
 import { getLanguage, type LanguageId } from "./domain/languages";
 import { createTranslationRequest, createTranslationSystemPrompt } from "./domain/prompts";
+import { MAX_SOURCE_TEXT_LENGTH } from "./domain/translation-session";
 import {
   createTranslationRows,
   translationResultMarkdown,
@@ -33,8 +34,6 @@ import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
 import { translateWithBaidu } from "./services/baidu-translate";
 import { translateWithGoogle } from "./services/google-translate";
 import { streamModelResponse } from "./services/model";
-
-const MAX_SOURCE_LENGTH = 5_000;
 
 interface ModelRevision {
   id: string;
@@ -591,7 +590,10 @@ export function TranslateResult({
   );
 }
 
-type TranslateLaunchProps = LaunchProps<{ arguments: Arguments.Translate }>;
+type TranslateLaunchProps = LaunchProps<{
+  arguments: Arguments.Translate;
+  launchContext?: { translationSessionId?: string };
+}>;
 
 export default function TranslateCommand(props: TranslateLaunchProps) {
   const preferences = getPreferenceValues<Preferences>();
@@ -602,7 +604,7 @@ export default function TranslateCommand(props: TranslateLaunchProps) {
   } = useLaunchInput({
     argumentText: props.arguments.sourceText,
     fallbackText: props.fallbackText,
-    maxLength: MAX_SOURCE_LENGTH,
+    maxLength: MAX_SOURCE_TEXT_LENGTH,
     label: "Source Text",
   });
 
@@ -639,6 +641,7 @@ export default function TranslateCommand(props: TranslateLaunchProps) {
 
   return (
     <TranslateResult
+      key={props.launchContext?.translationSessionId}
       sourceText={input.text}
       targetLanguage={targetLanguage}
       preferences={preferences}

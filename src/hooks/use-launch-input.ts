@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getLaunchInputError, type LaunchInput } from "../lib/launch-input";
+import { getLaunchInputError, resolveLaunchInput, type LaunchInput } from "../lib/launch-input";
 import { readLaunchInput } from "../lib/read-launch-input";
 
 interface UseLaunchInputOptions {
@@ -21,15 +21,18 @@ export function useLaunchInput({
   maxLength,
   label,
 }: UseLaunchInputOptions): UseLaunchInputResult {
+  const explicitInput = resolveLaunchInput({ argumentText });
   const [input, setInput] = useState<LaunchInput>();
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (argumentText?.trim()) return;
+
     let isCancelled = false;
     setIsLoading(true);
 
-    void readLaunchInput(argumentText, fallbackText).then((resolvedInput) => {
+    void readLaunchInput(undefined, fallbackText).then((resolvedInput) => {
       if (isCancelled) return;
       setInput(resolvedInput);
       setError(getLaunchInputError(resolvedInput, maxLength, label));
@@ -40,6 +43,14 @@ export function useLaunchInput({
       isCancelled = true;
     };
   }, [argumentText, fallbackText, label, maxLength]);
+
+  if (explicitInput) {
+    return {
+      input: explicitInput,
+      error: getLaunchInputError(explicitInput, maxLength, label),
+      isLoading: false,
+    };
+  }
 
   return { input, error, isLoading };
 }

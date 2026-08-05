@@ -47,6 +47,8 @@ declare namespace Preferences {
   /** Model ID - Optional model override for Chat */
   "modelOverride"?: string
 }
+  /** Preferences accessible in the `quick-translate` command */
+  export type QuickTranslate = ExtensionPreferences & {}
   /** Preferences accessible in the `translate` command */
   export type Translate = ExtensionPreferences & {
   /** Model Provider - Override the global provider for Translate */
@@ -62,6 +64,8 @@ declare namespace Arguments {
   /** Question or term */
   "question": string
 }
+  /** Arguments passed to the `quick-translate` command */
+  export type QuickTranslate = {}
   /** Arguments passed to the `translate` command */
   export type Translate = {
   /** Text to translate */
