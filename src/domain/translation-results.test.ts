@@ -1,67 +1,58 @@
 import { describe, expect, it } from "vitest";
-import { createTranslationRows, translationResultMarkdown } from "./translation-results";
+import {
+  createSourceTextPreview,
+  createTranslationDetailMarkdown,
+  translationResultMarkdown,
+} from "./translation-results";
 
-describe("createTranslationRows", () => {
-  it("keeps Model, Google, Baidu, and Source Text in a stable order", () => {
-    const rows = createTranslationRows({
+describe("createTranslationDetailMarkdown", () => {
+  it("lays out only configured translations in a stable order", () => {
+    const markdown = createTranslationDetailMarkdown({
       model: { status: "loading" },
       google: { status: "success", text: "Google result" },
-      baidu: { status: "unconfigured", error: "Not configured" },
-      sourceText: "Original text",
-      revisionCount: 0,
     });
 
-    expect(rows.map((row) => row.id)).toEqual(["model", "google", "baidu", "source"]);
+    expect(markdown).toBe(
+      "# Model Translation\n\n_Translating…_\n\n---\n\n# Google Translation\n\nGoogle result",
+    );
+    expect(markdown).not.toContain("Baidu Translation");
+    expect(markdown).not.toContain("Source Text");
   });
 
-  it("creates concise previews and exposes the latest model revision count", () => {
-    const rows = createTranslationRows({
-      model: { status: "success", text: "## Translation\n\n**Hello** world" },
-      google: { status: "loading" },
-      baidu: { status: "error", error: "Quota\nexceeded" },
-      sourceText: "Original\ntext",
-      revisionCount: 2,
-    });
-
-    expect(rows).toEqual([
-      {
-        id: "model",
-        title: "Model Translation",
-        status: "success",
-        preview: "Translation Hello world",
-        revisionLabel: "Revision 2",
-      },
-      {
-        id: "google",
-        title: "Google Translation",
-        status: "loading",
-        preview: "Translating…",
-      },
-      {
-        id: "baidu",
-        title: "Baidu Translation",
-        status: "error",
-        preview: "Quota exceeded",
-      },
-      {
-        id: "source",
-        title: "Source Text",
-        status: "success",
-        preview: "Original text",
-      },
-    ]);
+  it("places each current result directly below its service title", () => {
+    expect(
+      createTranslationDetailMarkdown({
+        model: { status: "loading", text: "Partial model result" },
+        google: { status: "error", error: "Quota exceeded" },
+        baidu: { status: "success", text: "Baidu result" },
+      }),
+    ).toBe(
+      [
+        "# Model Translation\n\nPartial model result",
+        "# Google Translation\n\n# Request Failed\n\n> Quota exceeded",
+        "# Baidu Translation\n\nBaidu result",
+      ].join("\n\n---\n\n"),
+    );
   });
 
-  it("keeps partial model output visible while translation is streaming", () => {
-    const rows = createTranslationRows({
-      model: { status: "loading", text: "## Translation\n\n**Partial** result" },
-      google: { status: "loading" },
-      baidu: { status: "loading" },
-      sourceText: "Original text",
-      revisionCount: 1,
-    });
+  it("shows a service-neutral preferences guide when none are configured", () => {
+    const markdown = createTranslationDetailMarkdown({});
 
-    expect(rows[0].preview).toBe("Translation Partial result");
+    expect(markdown).toBe(
+      "_No translation services are configured. Open Command Preferences to configure one._",
+    );
+    expect(markdown).not.toMatch(/Model|Google|Baidu/);
+  });
+});
+
+describe("createSourceTextPreview", () => {
+  it("creates a concise one-line preview of the original text", () => {
+    expect(createSourceTextPreview("## Original\n\n**source** text")).toBe("Original source text");
+  });
+});
+
+describe("translationResultMarkdown", () => {
+  it("keeps partial output visible while translation is streaming or fails", () => {
     expect(
       translationResultMarkdown({
         status: "loading",
@@ -75,5 +66,16 @@ describe("createTranslationRows", () => {
         error: "Generation stopped.",
       }),
     ).toContain("Partial result\n\n---\n\n# Request Failed");
+  });
+
+  it("renders loading, success, and error fallbacks", () => {
+    expect(translationResultMarkdown({ status: "loading" })).toBe("_Translating…_");
+    expect(translationResultMarkdown({ status: "success" })).toBe("_No translation returned._");
+    expect(
+      translationResultMarkdown({
+        status: "error",
+        error: "Quota exceeded",
+      }),
+    ).toBe("# Request Failed\n\n> Quota exceeded");
   });
 });

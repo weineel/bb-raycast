@@ -21,17 +21,26 @@ const raycast = vi.hoisted(() => ({
 
 const renderStats = vi.hoisted(() => ({
   sourceTexts: [] as string[],
+  itemIds: [] as string[],
+  detailMarkdowns: [] as string[],
+  actionTitles: [] as string[],
+  listLoading: [] as boolean[],
+  searchBarPlaceholders: [] as Array<string | undefined>,
 }));
 
 vi.mock("@raycast/api", () => {
   const Component = () => null;
   const Container = ({ children }: { children?: React.ReactNode }) => children ?? null;
-  const Action = Object.assign(Component, {
-    CopyToClipboard: Component,
-    Paste: Component,
-    SubmitForm: Component,
+  const ActionComponent = ({ title }: { title?: string }) => {
+    if (title) renderStats.actionTitles.push(title);
+    return null;
+  };
+  const Action = Object.assign(ActionComponent, {
+    CopyToClipboard: ActionComponent,
+    Paste: ActionComponent,
+    SubmitForm: ActionComponent,
   });
-  const ActionPanel = Object.assign(Component, { Submenu: Component });
+  const ActionPanel = Object.assign(Container, { Submenu: Container });
   const Detail = Object.assign(Component, {
     Metadata: Object.assign(Component, { Label: Component }),
   });
@@ -39,11 +48,41 @@ vi.mock("@raycast/api", () => {
     Description: Component,
     TextArea: Component,
   });
-  const ListItem = ({ id, subtitle }: { id?: string; subtitle?: string }) => {
+  const ListItem = ({
+    id,
+    subtitle,
+    detail,
+    actions,
+  }: {
+    id?: string;
+    subtitle?: string;
+    detail?: React.ReactElement<{ markdown?: string }>;
+    actions?: React.ReactNode;
+  }) => {
+    if (id) renderStats.itemIds.push(id);
     if (id === "source" && subtitle) renderStats.sourceTexts.push(subtitle);
-    return null;
+    if (detail?.props.markdown) renderStats.detailMarkdowns.push(detail.props.markdown);
+    return (
+      <>
+        {detail}
+        {actions}
+      </>
+    );
   };
-  const List = Object.assign(Container, {
+  const ListContainer = ({
+    children,
+    isLoading,
+    searchBarPlaceholder,
+  }: {
+    children?: React.ReactNode;
+    isLoading?: boolean;
+    searchBarPlaceholder?: string;
+  }) => {
+    renderStats.listLoading.push(!!isLoading);
+    renderStats.searchBarPlaceholders.push(searchBarPlaceholder);
+    return children ?? null;
+  };
+  const List = Object.assign(ListContainer, {
     Item: Object.assign(ListItem, {
       Detail: Object.assign(Component, {
         Metadata: Object.assign(Component, { Label: Component }),
@@ -179,6 +218,11 @@ describe("initial requests", () => {
     vi.useFakeTimers();
     raycast.getPreferenceValues.mockReturnValue(preferences);
     renderStats.sourceTexts.length = 0;
+    renderStats.itemIds.length = 0;
+    renderStats.detailMarkdowns.length = 0;
+    renderStats.actionTitles.length = 0;
+    renderStats.listLoading.length = 0;
+    renderStats.searchBarPlaceholders.length = 0;
     Object.assign(requestStats, {
       modelStarted: 0,
       modelCompleted: 0,
@@ -216,6 +260,64 @@ describe("initial requests", () => {
     expect(requestStats.baiduStarted).toBe(1);
     expect(requestStats.baiduCompleted).toBe(1);
     renderer.unmount();
+  });
+
+  it("renders one Source Text item with all configured translations in its detail", async () => {
+    const renderer = await renderStrictMode(
+      <TranslateResult
+        sourceText="hello"
+        targetLanguage="zh-CN"
+        preferences={preferences}
+        activeModel={activeModel}
+      />,
+    );
+
+    expect(new Set(renderStats.itemIds)).toEqual(new Set(["source"]));
+    expect(renderStats.detailMarkdowns.at(-1)).toBe(
+      [
+        "# Model Translation\n\nModel result",
+        "# Google Translation\n\nGoogle result",
+        "# Baidu Translation\n\nBaidu result",
+      ].join("\n\n---\n\n"),
+    );
+    expect(renderStats.detailMarkdowns.at(-1)).not.toContain("Source Text");
+    expect(renderStats.listLoading).toContain(true);
+    expect(renderStats.listLoading.at(-1)).toBe(false);
+    expect(renderStats.searchBarPlaceholders).not.toContain("Filter translation results");
+    renderer.unmount();
+  });
+
+  it("hides unconfigured translations from the first render and their actions", async () => {
+    const unconfiguredPreferences: Preferences = {
+      ...preferences,
+      googleApiKey: " ",
+      baiduAppId: "configured-id",
+      baiduSecretKey: "",
+    };
+    let renderer: ReactTestRenderer | undefined;
+
+    await act(async () => {
+      renderer = create(
+        <TranslateResult
+          sourceText="hello"
+          targetLanguage="zh-CN"
+          preferences={unconfiguredPreferences}
+        />,
+      );
+    });
+
+    expect(new Set(renderStats.itemIds)).toEqual(new Set(["source"]));
+    expect(renderStats.detailMarkdowns).toEqual([
+      "_No translation services are configured. Open Command Preferences to configure one._",
+    ]);
+    expect(new Set(renderStats.actionTitles)).toEqual(
+      new Set(["Copy Source Text", "Open Command Preferences"]),
+    );
+    expect(requestStats.modelStarted).toBe(0);
+    expect(requestStats.googleStarted).toBe(0);
+    expect(requestStats.baiduStarted).toBe(0);
+    expect(renderStats.listLoading.at(-1)).toBe(false);
+    renderer?.unmount();
   });
 
   it("starts a new Translation Session when the launch context changes", async () => {
