@@ -21,8 +21,7 @@ import { getLanguage, type LanguageId } from "./domain/languages";
 import { createTranslationRequest, createTranslationSystemPrompt } from "./domain/prompts";
 import { MAX_SOURCE_TEXT_LENGTH } from "./domain/translation-session";
 import {
-  createSourceTextPreview,
-  createTranslationDetailMarkdown,
+  createTranslationPageMarkdown,
   translationResultMarkdown,
   type TranslationResultState,
   type TranslationResultStatus,
@@ -122,6 +121,24 @@ function FollowUpForm({ onSubmit }: { onSubmit: (instruction: string) => void })
         text="This refines the original Source Text. It does not change the target language."
       />
     </Form>
+  );
+}
+
+function SourceTextDetail({ sourceText }: { sourceText: string }) {
+  return (
+    <Detail
+      navigationTitle="Source Text"
+      markdown={sourceText}
+      actions={
+        <ActionPanel>
+          <Action.CopyToClipboard
+            title="Copy Source Text"
+            content={sourceText}
+            shortcut={Keyboard.Shortcut.Common.Copy}
+          />
+        </ActionPanel>
+      }
+    />
   );
 }
 
@@ -353,7 +370,7 @@ export function TranslateResult({
 
   const latestRevision = revisions[0];
   const model: TranslationResultState = latestRevision || { status: "loading" };
-  const detailMarkdown = createTranslationDetailMarkdown({
+  const detailMarkdown = createTranslationPageMarkdown(sourceText, {
     ...(activeModel ? { model } : {}),
     ...(hasGoogleTranslation ? { google } : {}),
     ...(hasBaiduTranslation ? { baidu } : {}),
@@ -438,39 +455,33 @@ export function TranslateResult({
   }
 
   return (
-    <List
+    <Detail
       navigationTitle={`Translate to ${getLanguage(targetLanguage).label}`}
-      isShowingDetail
       isLoading={isLoading}
-    >
-      <List.Item
-        id="source"
-        title="Source Text"
-        subtitle={createSourceTextPreview(sourceText)}
-        icon={{ source: Icon.Document, tintColor: Color.SecondaryText }}
-        accessories={[{ text: `${Array.from(sourceText).length.toLocaleString()} characters` }]}
-        detail={<List.Item.Detail markdown={detailMarkdown} />}
-        actions={
-          <ActionPanel>
-            {activeModel ? modelActions() : null}
-            {hasGoogleTranslation
-              ? referenceActions("Google Translation", google, runGoogle)
-              : null}
-            {hasBaiduTranslation ? referenceActions("Baidu Translation", baidu, runBaidu) : null}
-            <Action.CopyToClipboard
-              title="Copy Source Text"
-              content={sourceText}
-              shortcut={Keyboard.Shortcut.Common.Copy}
-            />
-            <Action
-              title="Open Command Preferences"
-              icon={Icon.Gear}
-              onAction={openCommandPreferences}
-            />
-          </ActionPanel>
-        }
-      />
-    </List>
+      markdown={detailMarkdown}
+      actions={
+        <ActionPanel>
+          <Action
+            title="View Full Source Text"
+            icon={Icon.Eye}
+            onAction={() => push(<SourceTextDetail sourceText={sourceText} />)}
+          />
+          {activeModel ? modelActions() : null}
+          {hasGoogleTranslation ? referenceActions("Google Translation", google, runGoogle) : null}
+          {hasBaiduTranslation ? referenceActions("Baidu Translation", baidu, runBaidu) : null}
+          <Action.CopyToClipboard
+            title="Copy Source Text"
+            content={sourceText}
+            shortcut={Keyboard.Shortcut.Common.Copy}
+          />
+          <Action
+            title="Open Command Preferences"
+            icon={Icon.Gear}
+            onAction={openCommandPreferences}
+          />
+        </ActionPanel>
+      }
+    />
   );
 }
 

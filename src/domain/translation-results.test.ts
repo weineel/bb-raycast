@@ -2,8 +2,29 @@ import { describe, expect, it } from "vitest";
 import {
   createSourceTextPreview,
   createTranslationDetailMarkdown,
+  createTranslationPageMarkdown,
+  SOURCE_TEXT_PREVIEW_LENGTH,
   translationResultMarkdown,
 } from "./translation-results";
+
+describe("createSourceTextPreview", () => {
+  it("collapses the Source Text to one line and truncates it by Unicode character", () => {
+    expect(createSourceTextPreview("first line\n\nsecond line")).toBe("first line second line");
+    expect(createSourceTextPreview("译".repeat(SOURCE_TEXT_PREVIEW_LENGTH + 1))).toBe(
+      `${"译".repeat(SOURCE_TEXT_PREVIEW_LENGTH)}…`,
+    );
+  });
+});
+
+describe("createTranslationPageMarkdown", () => {
+  it("places a Markdown-safe Source Text preview before the translations", () => {
+    expect(
+      createTranslationPageMarkdown("# Original\ntext", {
+        model: { status: "success", text: "Translation" },
+      }),
+    ).toBe("\\# Original text\n\n---\n\n# Model Translation\n\nTranslation");
+  });
+});
 
 describe("createTranslationDetailMarkdown", () => {
   it("lays out only configured translations in a stable order", () => {
@@ -42,12 +63,6 @@ describe("createTranslationDetailMarkdown", () => {
       "_No translation services are configured. Open Command Preferences to configure one._",
     );
     expect(markdown).not.toMatch(/Model|Google|Baidu/);
-  });
-});
-
-describe("createSourceTextPreview", () => {
-  it("creates a concise one-line preview of the original text", () => {
-    expect(createSourceTextPreview("## Original\n\n**source** text")).toBe("Original source text");
   });
 });
 

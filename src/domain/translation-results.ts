@@ -12,14 +12,17 @@ export interface TranslationDetailResults {
   baidu?: TranslationResultState;
 }
 
+export const SOURCE_TEXT_PREVIEW_LENGTH = 48;
+
+function escapeMarkdownText(value: string): string {
+  return value.replace(/([\\`*_[\]{}()<>#+\-.!|])/g, "\\$1");
+}
+
 export function createSourceTextPreview(sourceText: string): string {
-  return sourceText
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^>\s?/gm, "")
-    .replace(/[*_`~]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const oneLine = sourceText.replace(/\s+/g, " ").trim();
+  const characters = Array.from(oneLine);
+  if (characters.length <= SOURCE_TEXT_PREVIEW_LENGTH) return oneLine;
+  return `${characters.slice(0, SOURCE_TEXT_PREVIEW_LENGTH).join("")}…`;
 }
 
 export function translationResultMarkdown(result: TranslationResultState): string {
@@ -51,4 +54,12 @@ export function createTranslationDetailMarkdown(results: TranslationDetailResult
   return sections
     .map(({ title, result }) => `# ${title}\n\n${translationResultMarkdown(result)}`)
     .join("\n\n---\n\n");
+}
+
+export function createTranslationPageMarkdown(
+  sourceText: string,
+  results: TranslationDetailResults,
+): string {
+  const sourcePreview = escapeMarkdownText(createSourceTextPreview(sourceText));
+  return `${sourcePreview}\n\n---\n\n${createTranslationDetailMarkdown(results)}`;
 }

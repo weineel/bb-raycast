@@ -19,20 +19,27 @@ const raycast = vi.hoisted(() => ({
   getPreferenceValues: vi.fn(),
 }));
 
+const navigation = vi.hoisted(() => ({
+  pop: vi.fn(),
+  push: vi.fn(),
+}));
+
 const renderStats = vi.hoisted(() => ({
-  sourceTexts: [] as string[],
   itemIds: [] as string[],
   detailMarkdowns: [] as string[],
   actionTitles: [] as string[],
-  listLoading: [] as boolean[],
-  searchBarPlaceholders: [] as Array<string | undefined>,
+  actionHandlers: [] as Array<{ title: string; onAction?: () => void }>,
+  detailLoading: [] as boolean[],
 }));
 
 vi.mock("@raycast/api", () => {
   const Component = () => null;
   const Container = ({ children }: { children?: React.ReactNode }) => children ?? null;
-  const ActionComponent = ({ title }: { title?: string }) => {
-    if (title) renderStats.actionTitles.push(title);
+  const ActionComponent = ({ title, onAction }: { title?: string; onAction?: () => void }) => {
+    if (title) {
+      renderStats.actionTitles.push(title);
+      renderStats.actionHandlers.push({ title, onAction });
+    }
     return null;
   };
   const Action = Object.assign(ActionComponent, {
@@ -41,7 +48,22 @@ vi.mock("@raycast/api", () => {
     SubmitForm: ActionComponent,
   });
   const ActionPanel = Object.assign(Container, { Submenu: Container });
-  const Detail = Object.assign(Component, {
+  const DetailComponent = ({
+    markdown,
+    actions,
+    isLoading,
+  }: {
+    markdown?: string;
+    actions?: React.ReactNode;
+    isLoading?: boolean;
+  }) => {
+    if (markdown) {
+      renderStats.detailMarkdowns.push(markdown);
+    }
+    renderStats.detailLoading.push(!!isLoading);
+    return actions ?? null;
+  };
+  const Detail = Object.assign(DetailComponent, {
     Metadata: Object.assign(Component, { Label: Component }),
   });
   const Form = Object.assign(Component, {
@@ -50,17 +72,14 @@ vi.mock("@raycast/api", () => {
   });
   const ListItem = ({
     id,
-    subtitle,
     detail,
     actions,
   }: {
     id?: string;
-    subtitle?: string;
     detail?: React.ReactElement<{ markdown?: string }>;
     actions?: React.ReactNode;
   }) => {
     if (id) renderStats.itemIds.push(id);
-    if (id === "source" && subtitle) renderStats.sourceTexts.push(subtitle);
     if (detail?.props.markdown) renderStats.detailMarkdowns.push(detail.props.markdown);
     return (
       <>
@@ -69,19 +88,7 @@ vi.mock("@raycast/api", () => {
       </>
     );
   };
-  const ListContainer = ({
-    children,
-    isLoading,
-    searchBarPlaceholder,
-  }: {
-    children?: React.ReactNode;
-    isLoading?: boolean;
-    searchBarPlaceholder?: string;
-  }) => {
-    renderStats.listLoading.push(!!isLoading);
-    renderStats.searchBarPlaceholders.push(searchBarPlaceholder);
-    return children ?? null;
-  };
+  const ListContainer = ({ children }: { children?: React.ReactNode }) => children ?? null;
   const List = Object.assign(ListContainer, {
     Item: Object.assign(ListItem, {
       Detail: Object.assign(Component, {
@@ -111,7 +118,7 @@ vi.mock("@raycast/api", () => {
     getPreferenceValues: raycast.getPreferenceValues,
     openCommandPreferences: vi.fn(),
     showToast: vi.fn(),
-    useNavigation: () => ({ pop: vi.fn(), push: vi.fn() }),
+    useNavigation: () => navigation,
   };
 });
 
@@ -217,12 +224,13 @@ describe("initial requests", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     raycast.getPreferenceValues.mockReturnValue(preferences);
-    renderStats.sourceTexts.length = 0;
+    navigation.pop.mockClear();
+    navigation.push.mockClear();
     renderStats.itemIds.length = 0;
     renderStats.detailMarkdowns.length = 0;
     renderStats.actionTitles.length = 0;
-    renderStats.listLoading.length = 0;
-    renderStats.searchBarPlaceholders.length = 0;
+    renderStats.actionHandlers.length = 0;
+    renderStats.detailLoading.length = 0;
     Object.assign(requestStats, {
       modelStarted: 0,
       modelCompleted: 0,
@@ -262,7 +270,7 @@ describe("initial requests", () => {
     renderer.unmount();
   });
 
-  it("renders one Source Text item with all configured translations in its detail", async () => {
+  it("renders one Detail with a Source Text preview and all configured translations", async () => {
     const renderer = await renderStrictMode(
       <TranslateResult
         sourceText="hello"
@@ -272,18 +280,44 @@ describe("initial requests", () => {
       />,
     );
 
-    expect(new Set(renderStats.itemIds)).toEqual(new Set(["source"]));
+    expect(renderStats.itemIds).toEqual([]);
     expect(renderStats.detailMarkdowns.at(-1)).toBe(
       [
+        "hello",
         "# Model Translation\n\nModel result",
         "# Google Translation\n\nGoogle result",
         "# Baidu Translation\n\nBaidu result",
       ].join("\n\n---\n\n"),
     );
-    expect(renderStats.detailMarkdowns.at(-1)).not.toContain("Source Text");
-    expect(renderStats.listLoading).toContain(true);
-    expect(renderStats.listLoading.at(-1)).toBe(false);
-    expect(renderStats.searchBarPlaceholders).not.toContain("Filter translation results");
+    expect(renderStats.detailLoading).toContain(true);
+    expect(renderStats.detailLoading.at(-1)).toBe(false);
+    expect(renderStats.actionTitles).toContain("View Full Source Text");
+    renderer.unmount();
+  });
+
+  it("opens the full Source Text from the preview action", async () => {
+    const sourceText = "first line\nsecond line";
+    const renderer = await renderStrictMode(
+      <TranslateResult
+        sourceText={sourceText}
+        targetLanguage="zh-CN"
+        preferences={preferences}
+        activeModel={activeModel}
+      />,
+    );
+    const viewSource = renderStats.actionHandlers.findLast(
+      (action) => action.title === "View Full Source Text",
+    );
+
+    await act(async () => viewSource?.onAction?.());
+    expect(navigation.push).toHaveBeenCalledOnce();
+
+    let sourceRenderer: ReactTestRenderer | undefined;
+    await act(async () => {
+      sourceRenderer = create(navigation.push.mock.lastCall?.[0]);
+    });
+    expect(renderStats.detailMarkdowns.at(-1)).toBe(sourceText);
+    sourceRenderer?.unmount();
     renderer.unmount();
   });
 
@@ -306,17 +340,20 @@ describe("initial requests", () => {
       );
     });
 
-    expect(new Set(renderStats.itemIds)).toEqual(new Set(["source"]));
+    expect(renderStats.itemIds).toEqual([]);
     expect(renderStats.detailMarkdowns).toEqual([
-      "_No translation services are configured. Open Command Preferences to configure one._",
+      [
+        "hello",
+        "_No translation services are configured. Open Command Preferences to configure one._",
+      ].join("\n\n---\n\n"),
     ]);
     expect(new Set(renderStats.actionTitles)).toEqual(
-      new Set(["Copy Source Text", "Open Command Preferences"]),
+      new Set(["View Full Source Text", "Copy Source Text", "Open Command Preferences"]),
     );
     expect(requestStats.modelStarted).toBe(0);
     expect(requestStats.googleStarted).toBe(0);
     expect(requestStats.baiduStarted).toBe(0);
-    expect(renderStats.listLoading.at(-1)).toBe(false);
+    expect(renderStats.detailLoading.at(-1)).toBe(false);
     renderer?.unmount();
   });
 
@@ -350,7 +387,7 @@ describe("initial requests", () => {
     const renderer = await renderStrictMode(
       <TranslateCommand {...translateCommandProps("session-1", "previous source")} />,
     );
-    renderStats.sourceTexts.length = 0;
+    renderStats.detailMarkdowns.length = 0;
 
     await act(async () => {
       renderer.update(
@@ -360,8 +397,12 @@ describe("initial requests", () => {
       );
     });
 
-    expect(renderStats.sourceTexts).toContain("current source");
-    expect(renderStats.sourceTexts).not.toContain("previous source");
+    expect(
+      renderStats.detailMarkdowns.some((markdown) => markdown.startsWith("current source")),
+    ).toBe(true);
+    expect(
+      renderStats.detailMarkdowns.some((markdown) => markdown.includes("previous source")),
+    ).toBe(false);
     renderer.unmount();
   });
 });
