@@ -36,4 +36,37 @@ describe("reference translation services", () => {
       "Invalid Sign (54001)",
     );
   });
+
+  it("includes British and American phonetics from Baidu dictionary JSON", () => {
+    expect(
+      parseBaiduTranslation({
+        trans_result: [{ dst: "你好" }],
+        dict: JSON.stringify({
+          word_result: {
+            simple_means: { symbols: [{ ph_en: "həˈləʊ", ph_am: "həˈloʊ" }] },
+          },
+        }),
+      }),
+    ).toBe("你好\n\n英 /həˈləʊ/ · 美 /həˈloʊ/");
+  });
+
+  it("omits missing or blank pronunciations", () => {
+    expect(
+      parseBaiduTranslation({
+        trans_result: [{ dst: "你好" }],
+        dict: JSON.stringify({
+          word_result: {
+            simple_means: { symbols: [{ ph_en: " ", ph_am: " həˈloʊ " }] },
+          },
+        }),
+      }),
+    ).toBe("你好\n\n美 /həˈloʊ/");
+  });
+
+  it.each(["", "invalid JSON", "null", "{}", '{"word_result":{"simple_means":{"symbols":{}}}}'])(
+    "preserves the translation when optional dictionary data is unavailable: %s",
+    (dict) => {
+      expect(parseBaiduTranslation({ trans_result: [{ dst: "你好" }], dict })).toBe("你好");
+    },
+  );
 });

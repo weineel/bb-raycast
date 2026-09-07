@@ -45,6 +45,9 @@ Google 翻译为可选功能。Benben AI 使用官方 Cloud Translation Basic v2
 
 百度翻译为可选功能，使用官方通用文本翻译 API。
 
+英文单词的返回结果包含词典数据时，译文下方会显示英式、美式音标。
+这需要百度账号额外开通词典资源，申请方式见[官方词典接入说明](https://fanyiapp.cdn.bcebos.com/api/doc/百度翻译API词典资源-接入字段说明.pdf)。未开通或接口未返回音标时，仅显示译文。
+
 1. 在[百度翻译开放平台](https://fanyi-api.baidu.com/)注册应用。
 2. 复制应用的 **APP ID** 和**密钥**。
 3. 将两项内容填入 Benben AI 对应的偏好设置。

@@ -3,8 +3,36 @@ import { getLanguage, type LanguageId } from "../domain/languages";
 
 interface BaiduTranslationResponse {
   trans_result?: Array<{ dst?: string }>;
+  dict?: string;
   error_code?: string;
   error_msg?: string;
+}
+
+function parseBaiduPhonetics(dict: string | undefined): string {
+  if (!dict) return "";
+
+  try {
+    const dictionary = JSON.parse(dict);
+    const symbols = dictionary?.word_result?.simple_means?.symbols;
+    if (!Array.isArray(symbols)) return "";
+
+    return symbols
+      .map((symbol) =>
+        [
+          ["英", symbol?.ph_en],
+          ["美", symbol?.ph_am],
+        ]
+          .flatMap(([label, value]) =>
+            typeof value === "string" && value.trim() ? [`${label} /${value.trim()}/`] : [],
+          )
+          .join(" · "),
+      )
+      .filter(Boolean)
+      .join("\n\n");
+  } catch {
+    // Optional dictionary data must not prevent displaying a successful translation.
+    return "";
+  }
 }
 
 export function createBaiduSignature(
@@ -28,7 +56,8 @@ export function parseBaiduTranslation(payload: BaiduTranslationResponse): string
       : "Baidu Translation returned no result.";
     throw new Error(detail);
   }
-  return translatedText;
+  const phonetics = parseBaiduPhonetics(payload.dict);
+  return phonetics ? `${translatedText}\n\n${phonetics}` : translatedText;
 }
 
 export async function translateWithBaidu(

@@ -24,12 +24,14 @@ Translate the fixed Source Text into ${targetLanguage}.
 
 For a single word or term:
 - Give the most contextually likely translation first.
+- If the Source Text is a single word, include its pronunciation in the source language using IPA between slashes immediately after the translation. For English words, label British and American pronunciations separately when they differ. If pronunciation depends on the sense or part of speech, associate each pronunciation with the relevant meaning. If you cannot confidently determine the pronunciation, briefly say so instead of inventing an IPA transcription.
 - Briefly cover relevant senses, parts of speech, and usage.
 - Explicitly note meaningful ambiguity.
 
 For a sentence or passage:
 - Produce a faithful, natural translation.
 - Preserve tone, formality, formatting, terminology, and proper names.
+- Do not add phonetic transcriptions unless explicitly requested.
 
 After the translation, add a brief explanation of important wording, ambiguity, or translation choices. Return readable Markdown only; no JSON or fixed schema.
 
