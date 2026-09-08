@@ -462,6 +462,24 @@
           "value": "hi"
         }
       ]
+    },
+    {
+      "name": "speechEnglishAccent",
+      "title": "English Reading Accent",
+      "description": "English accent for local Source Text speech. Requires an installed macOS voice for the selected accent.",
+      "type": "dropdown",
+      "required": true,
+      "default": "en-US",
+      "data": [
+        {
+          "title": "American English",
+          "value": "en-US"
+        },
+        {
+          "title": "British English",
+          "value": "en-GB"
+        }
+      ]
     }
   ],
   "scripts": {

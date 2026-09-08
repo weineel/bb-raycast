@@ -1,6 +1,7 @@
 export type ModelProviderId = "openai" | "anthropic" | "openai-compatible";
 
 export interface Preferences {
+  speechEnglishAccent?: "en-US" | "en-GB";
   defaultProvider: ModelProviderId;
   defaultOpenAIModel: string;
   defaultAnthropicModel: string;

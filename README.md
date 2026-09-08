@@ -56,6 +56,18 @@ Google 翻译为可选功能。Benben AI 使用官方 Cloud Translation Basic v2
 
 ## 使用方法
 
+### 朗读原文
+
+在翻译结果页或 **View Full Source Text** 页面，使用 **Read Source Text** 或 `⌘⇧P`
+朗读原文；播放时同一快捷键或 **Stop Reading** 可停止。两个页面之间切换会继续播放，
+退出翻译会话会停止。朗读独立于模型、Google 和百度翻译，无需 API Key。
+
+使用 macOS 本地语言识别和语音，支持中文、英文及中英混合文本（按识别出的主要语言朗读）；
+其他语言会提示暂不支持。英文默认美式，可在 **English Reading Accent** 设置中选择英式。
+缺少上下文的单个拉丁字母词，在系统识别置信度较低时按英文朗读；自动识别仍可能有误。
+缺少对应语音时，请在 macOS **系统设置 → 辅助功能 → 朗读与语音** 中下载后重试。
+使用默认语速，首版不提供暂停或续播。
+
 ### Chat
 
 1. 在 Raycast 中找到 **Chat**，按需填写 `Question` 参数。

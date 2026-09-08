@@ -24,21 +24,43 @@ const navigation = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
+const speechCommands = vi.hoisted(
+  () =>
+    [] as Array<{
+      signal: AbortSignal;
+      finish: (error: Error | null, stdout: string) => void;
+    }>,
+);
+vi.mock("node:child_process", () => ({
+  execFile: vi.fn((_file, _args, options, callback) => {
+    speechCommands.push({ signal: options.signal, finish: callback });
+    return { stdin: { end: vi.fn(), on: vi.fn() } };
+  }),
+}));
+
 const renderStats = vi.hoisted(() => ({
   itemIds: [] as string[],
   detailMarkdowns: [] as string[],
   actionTitles: [] as string[],
-  actionHandlers: [] as Array<{ title: string; onAction?: () => void }>,
+  actionHandlers: [] as Array<{ title: string; onAction?: () => void; shortcut?: unknown }>,
   detailLoading: [] as boolean[],
 }));
 
 vi.mock("@raycast/api", () => {
   const Component = () => null;
   const Container = ({ children }: { children?: React.ReactNode }) => children ?? null;
-  const ActionComponent = ({ title, onAction }: { title?: string; onAction?: () => void }) => {
+  const ActionComponent = ({
+    title,
+    onAction,
+    shortcut,
+  }: {
+    title?: string;
+    onAction?: () => void;
+    shortcut?: unknown;
+  }) => {
     if (title) {
       renderStats.actionTitles.push(title);
-      renderStats.actionHandlers.push({ title, onAction });
+      renderStats.actionHandlers.push({ title, onAction, shortcut });
     }
     return null;
   };
@@ -348,7 +370,12 @@ describe("initial requests", () => {
       ].join("\n\n---\n\n"),
     ]);
     expect(new Set(renderStats.actionTitles)).toEqual(
-      new Set(["View Full Source Text", "Copy Source Text", "Open Command Preferences"]),
+      new Set([
+        "View Full Source Text",
+        "Read Source Text",
+        "Copy Source Text",
+        "Open Command Preferences",
+      ]),
     );
     expect(requestStats.modelStarted).toBe(0);
     expect(requestStats.googleStarted).toBe(0);
@@ -381,6 +408,45 @@ describe("initial requests", () => {
     expect(requestStats.googleStarted).toBe(2);
     expect(requestStats.baiduStarted).toBe(2);
     renderer.unmount();
+  });
+
+  it("shares speech across the result and source pages and stops when the session exits", async () => {
+    speechCommands.length = 0;
+    const renderer = await renderStrictMode(
+      <TranslateResult sourceText="hello" targetLanguage="zh-CN" preferences={preferences} />,
+    );
+    const read = renderStats.actionHandlers.find((action) => action.title === "Read Source Text");
+    expect(read).toBeDefined();
+    expect(read?.shortcut).toEqual({ modifiers: ["cmd", "shift"], key: "p" });
+    await act(async () => {
+      read?.onAction?.();
+    });
+    expect(speechCommands).toHaveLength(2);
+    await act(async () => {
+      speechCommands[0].finish(null, "en");
+      speechCommands[1].finish(null, "Samantha en_US # Hello");
+    });
+    expect(speechCommands).toHaveLength(3);
+    renderStats.actionHandlers
+      .find((action) => action.title === "View Full Source Text")
+      ?.onAction?.();
+    const page = navigation.push.mock.calls.at(-1)?.[0];
+    renderStats.actionTitles.length = 0;
+    let sourcePage: ReactTestRenderer;
+    await act(async () => {
+      sourcePage = create(page);
+    });
+    expect(renderStats.actionTitles).toContain("Stop Reading");
+    expect(speechCommands[2].signal.aborted).toBe(false);
+    await act(async () => {
+      sourcePage!.unmount();
+    });
+    expect(speechCommands[2].signal.aborted).toBe(false);
+    await act(async () => {
+      renderer.unmount();
+    });
+    expect(speechCommands[2].signal.aborted).toBe(true);
+    speechCommands[2].finish(new Error("aborted"), "");
   });
 
   it("renders the new Source Text without flashing the previous Session input", async () => {

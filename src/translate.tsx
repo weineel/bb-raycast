@@ -14,7 +14,7 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
 import { LaunchError } from "./components/launch-error";
 import { getLanguage, type LanguageId } from "./domain/languages";
@@ -33,6 +33,8 @@ import { getSafeErrorMessage, isAbortError } from "./lib/safe-error";
 import { translateWithBaidu } from "./services/baidu-translate";
 import { translateWithGoogle } from "./services/google-translate";
 import { streamModelResponse } from "./services/model";
+import { SpeechController } from "./services/speech";
+import { SpeechAction, type SpeechActionProps } from "./components/speech-action";
 
 interface ModelRevision {
   id: string;
@@ -124,13 +126,14 @@ function FollowUpForm({ onSubmit }: { onSubmit: (instruction: string) => void })
   );
 }
 
-function SourceTextDetail({ sourceText }: { sourceText: string }) {
+function SourceTextDetail({ sourceText, speech, accent }: SpeechActionProps) {
   return (
     <Detail
       navigationTitle="Source Text"
       markdown={sourceText}
       actions={
         <ActionPanel>
+          <SpeechAction sourceText={sourceText} speech={speech} accent={accent} />
           <Action.CopyToClipboard
             title="Copy Source Text"
             content={sourceText}
@@ -223,6 +226,9 @@ export function TranslateResult({
   activeModel?: ActiveModel;
 }) {
   const { push } = useNavigation();
+  const [speech] = useState(() => new SpeechController());
+  const accent = preferences.speechEnglishAccent ?? "en-US";
+  useEffect(() => () => speech.stop(), [speech]);
   const hasGoogleTranslation = !!preferences.googleApiKey?.trim();
   const hasBaiduTranslation =
     !!preferences.baiduAppId?.trim() && !!preferences.baiduSecretKey?.trim();
@@ -464,8 +470,11 @@ export function TranslateResult({
           <Action
             title="View Full Source Text"
             icon={Icon.Eye}
-            onAction={() => push(<SourceTextDetail sourceText={sourceText} />)}
+            onAction={() =>
+              push(<SourceTextDetail sourceText={sourceText} speech={speech} accent={accent} />)
+            }
           />
+          <SpeechAction sourceText={sourceText} speech={speech} accent={accent} />
           {activeModel ? modelActions() : null}
           {hasGoogleTranslation ? referenceActions("Google Translation", google, runGoogle) : null}
           {hasBaiduTranslation ? referenceActions("Baidu Translation", baidu, runBaidu) : null}

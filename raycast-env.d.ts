@@ -33,7 +33,9 @@ type ExtensionPreferences = {
   /** Default Answer Language - The language Chat normally responds in */
   "defaultAnswerLanguage": "zh-CN" | "zh-TW" | "en" | "ja" | "ko" | "fr" | "de" | "es" | "pt" | "it" | "ru" | "ar" | "th" | "vi" | "id" | "ms" | "hi",
   /** Default Translation Target - Initially selected by the Translate command */
-  "defaultTargetLanguage": "zh-CN" | "zh-TW" | "en" | "ja" | "ko" | "fr" | "de" | "es" | "pt" | "it" | "ru" | "ar" | "th" | "vi" | "id" | "ms" | "hi"
+  "defaultTargetLanguage": "zh-CN" | "zh-TW" | "en" | "ja" | "ko" | "fr" | "de" | "es" | "pt" | "it" | "ru" | "ar" | "th" | "vi" | "id" | "ms" | "hi",
+  /** English Reading Accent - English accent for local Source Text speech. Requires an installed macOS voice for the selected accent. */
+  "speechEnglishAccent": "en-US" | "en-GB"
 }
 
 /** Preferences accessible in all the extension's commands */
