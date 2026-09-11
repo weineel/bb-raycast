@@ -9,7 +9,7 @@ import {
   getPreferenceValues,
   openCommandPreferences,
 } from "@raycast/api";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
 import { LaunchError } from "./components/launch-error";
 import { createChatSystemPrompt } from "./domain/prompts";
@@ -180,19 +180,20 @@ export function ChatThread({
         </ActionPanel>
       }
     >
-      {entries.map((entry) => (
-        <Form.Description
-          key={entry.id}
-          title={entry.role === "user" ? "You" : "Benben AI"}
-          text={entry.content}
-        />
+      {entries.map((entry, index) => (
+        <Fragment key={entry.id}>
+          {entry.role === "user" && index > 0 ? <Form.Separator /> : null}
+          <Form.Description
+            text={`${entry.role === "user" ? "You" : "Benben AI"}\n\n${entry.content}`}
+          />
+        </Fragment>
       ))}
       {isLoading ? (
-        <Form.Description key="streaming" title="Benben AI" text={streamingText || "Generating…"} />
+        <Form.Description key="streaming" text={`Benben AI\n\n${streamingText || "Generating…"}`} />
       ) : null}
-      {error ? <Form.Description key="error" title="Request Status" text={error} /> : null}
-      <Form.Description key="provider" title="Provider" text={activeModel.provider} />
-      <Form.Description key="model" title="Model" text={activeModel.model} />
+      {error ? <Form.Description key="error" text={`Request Status\n\n${error}`} /> : null}
+      <Form.Separator />
+      <Form.Description key="model" text={`${activeModel.provider} · ${activeModel.model}`} />
       <Form.TextField
         key="followUp"
         id="followUp"

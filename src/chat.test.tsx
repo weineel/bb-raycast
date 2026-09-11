@@ -28,7 +28,11 @@ vi.mock("@raycast/api", () => {
       Paste: () => null,
     }),
     ActionPanel: Container,
-    Form: Object.assign(Container, { Description: () => null, TextField: () => null }),
+    Form: Object.assign(Container, {
+      Description: () => null,
+      TextField: () => null,
+      Separator: () => null,
+    }),
     Detail: Object.assign(Container, { Metadata: Object.assign(Container, { Label: Item }) }),
     Icon: {},
     Keyboard: { Shortcut: { Common: { Copy: {} } } },
@@ -119,13 +123,12 @@ it("keeps a draft and the same input during streaming, without letting submit st
   expect(field().props.value).toBe("next question");
   expect(streamModelResponse).toHaveBeenCalledTimes(1);
   expect(vi.mocked(streamModelResponse).mock.lastCall?.[0].signal.aborted).toBe(false);
-  expect(descriptions()).toContain("Partial answer");
+  expect(descriptions()).toContain("Benben AI\n\nPartial answer");
   await act(async () => finish("Partial answer with final tail"));
   expect(descriptions()).toEqual([
-    "hello",
-    "Partial answer with final tail",
-    "openai",
-    "test-model",
+    "You\n\nhello",
+    "Benben AI\n\nPartial answer with final tail",
+    "openai · test-model",
   ]);
   expect(field().props.value).toBe("next question");
   expect(field()).toBe(input);
@@ -147,11 +150,10 @@ it("stops separately, preserves partial text and draft, then retries the same qu
       .props.onAction(),
   );
   expect(descriptions()).toEqual([
-    "hello",
-    "Partial",
-    "Generation stopped.",
-    "openai",
-    "test-model",
+    "You\n\nhello",
+    "Benben AI\n\nPartial",
+    "Request Status\n\nGeneration stopped.",
+    "openai · test-model",
   ]);
   expect(field().props.value).toBe("draft");
   await act(async () => {
@@ -166,7 +168,11 @@ it("stops separately, preserves partial text and draft, then retries the same qu
     { role: "user", content: "hello" },
   ]);
   await act(async () => finish("Retried answer"));
-  expect(descriptions()).toEqual(["hello", "Retried answer", "openai", "test-model"]);
+  expect(descriptions()).toEqual([
+    "You\n\nhello",
+    "Benben AI\n\nRetried answer",
+    "openai · test-model",
+  ]);
   expect(field().props.value).toBe("draft");
 });
 
