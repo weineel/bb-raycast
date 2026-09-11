@@ -8,9 +8,6 @@ import {
   LaunchProps,
   getPreferenceValues,
   openCommandPreferences,
-  showToast,
-  Toast,
-  useNavigation,
 } from "@raycast/api";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ModelMessage } from "ai";
@@ -42,60 +39,6 @@ function latestAssistantText(entries: ChatEntry[]): string | undefined {
   return entries.findLast((entry) => entry.role === "assistant")?.content;
 }
 
-function renderTranscript(entries: ChatEntry[], streamingText: string, error?: string): string {
-  const sections = entries.map((entry) => {
-    const title = entry.role === "user" ? "You" : "Benben AI";
-    return `## ${title}\n\n${entry.content}`;
-  });
-
-  if (streamingText) {
-    sections.push(`## Benben AI\n\n${streamingText}`);
-  }
-  if (error) {
-    sections.push(`> **Request failed:** ${error}`);
-  }
-  return sections.join("\n\n---\n\n");
-}
-
-function FollowUpForm({ onSubmit }: { onSubmit: (text: string) => void }) {
-  const { pop } = useNavigation();
-  const [text, setText] = useState("");
-
-  return (
-    <Form
-      navigationTitle="Follow Up"
-      actions={
-        <ActionPanel>
-          <Action.SubmitForm
-            title="Send Follow-Up"
-            icon={Icon.ArrowRight}
-            onSubmit={() => {
-              if (!text.trim()) {
-                void showToast({
-                  style: Toast.Style.Failure,
-                  title: "Enter a follow-up",
-                });
-                return;
-              }
-              pop();
-              onSubmit(text.trim());
-            }}
-          />
-        </ActionPanel>
-      }
-    >
-      <Form.TextArea
-        id="followUp"
-        title="Follow-Up"
-        placeholder="Add context, ask for more detail, or continue the conversation"
-        value={text}
-        onChange={setText}
-        autoFocus
-      />
-    </Form>
-  );
-}
-
 export function ChatThread({
   initialQuestion,
   preferences,
@@ -105,7 +48,7 @@ export function ChatThread({
   preferences: Preferences;
   activeModel: ActiveModel;
 }) {
-  const { push } = useNavigation();
+  const [followUp, setFollowUp] = useState("");
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string>();
@@ -155,6 +98,7 @@ export function ChatThread({
           isAbortError(requestError) ? "Generation stopped." : getSafeErrorMessage(requestError),
         );
       } finally {
+        abortControllerRef.current = undefined;
         setIsLoading(false);
       }
     },
@@ -163,25 +107,28 @@ export function ChatThread({
 
   const ask = useCallback(
     (question: string) => {
-      if (isLoading) return;
+      if (abortControllerRef.current) return false;
+      const text = question.trim();
+      if (!text) return false;
       const history = [
         ...entriesRef.current,
-        { id: createId(), role: "user" as const, content: question },
+        { id: createId(), role: "user" as const, content: text },
       ];
       updateEntries(history);
       void generate(history);
+      return true;
     },
-    [generate, isLoading, updateEntries],
+    [generate, updateEntries],
   );
 
   const retry = useCallback(() => {
-    if (isLoading) return;
+    if (abortControllerRef.current) return;
     const currentEntries = entriesRef.current;
     const history =
       currentEntries.at(-1)?.role === "assistant" ? currentEntries.slice(0, -1) : currentEntries;
     updateEntries(history);
     void generate(history);
-  }, [generate, isLoading, updateEntries]);
+  }, [generate, updateEntries]);
 
   const startInitialRequest = useCallback(() => {
     const initialEntries: ChatEntry[] = [
@@ -195,34 +142,23 @@ export function ChatThread({
   useInitialRequest(startInitialRequest, stopRequest);
 
   const latestAnswer = latestAssistantText(entries);
-  const markdown = renderTranscript(entries, streamingText, error);
 
   return (
-    <Detail
+    <Form
       navigationTitle="Chat Thread"
-      markdown={markdown}
-      isLoading={isLoading && !streamingText}
-      metadata={
-        <Detail.Metadata>
-          <Detail.Metadata.Label title="Provider" text={activeModel.provider} />
-          <Detail.Metadata.Label title="Model" text={activeModel.model} />
-        </Detail.Metadata>
-      }
+      isLoading={isLoading}
       actions={
         <ActionPanel>
+          <Action.SubmitForm
+            title="Send Follow-Up"
+            icon={Icon.ArrowRight}
+            onSubmit={() => {
+              if (ask(followUp)) setFollowUp("");
+            }}
+          />
           {isLoading ? (
-            <Action
-              title="Stop Generating"
-              icon={Icon.Stop}
-              onAction={() => abortControllerRef.current?.abort()}
-            />
-          ) : (
-            <Action
-              title="Follow up"
-              icon={Icon.ArrowRight}
-              onAction={() => push(<FollowUpForm onSubmit={ask} />)}
-            />
-          )}
+            <Action title="Stop Generating" icon={Icon.Stop} onAction={stopRequest} />
+          ) : null}
           {latestAnswer ? (
             <>
               <Action.CopyToClipboard
@@ -243,7 +179,30 @@ export function ChatThread({
           />
         </ActionPanel>
       }
-    />
+    >
+      {entries.map((entry) => (
+        <Form.Description
+          key={entry.id}
+          title={entry.role === "user" ? "You" : "Benben AI"}
+          text={entry.content}
+        />
+      ))}
+      {isLoading ? (
+        <Form.Description key="streaming" title="Benben AI" text={streamingText || "Generating…"} />
+      ) : null}
+      {error ? <Form.Description key="error" title="Request Status" text={error} /> : null}
+      <Form.Description key="provider" title="Provider" text={activeModel.provider} />
+      <Form.Description key="model" title="Model" text={activeModel.model} />
+      <Form.TextField
+        key="followUp"
+        id="followUp"
+        title="Follow-Up"
+        placeholder="Add context, ask for more detail, or continue the conversation"
+        value={followUp}
+        onChange={setFollowUp}
+        autoFocus
+      />
+    </Form>
   );
 }
 

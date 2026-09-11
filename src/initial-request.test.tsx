@@ -91,6 +91,7 @@ vi.mock("@raycast/api", () => {
   const Form = Object.assign(Component, {
     Description: Component,
     TextArea: Component,
+    TextField: Component,
   });
   const ListItem = ({
     id,
