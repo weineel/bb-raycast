@@ -30,7 +30,7 @@ vi.mock("@raycast/api", () => {
     ActionPanel: Container,
     Form: Object.assign(Container, {
       Description: () => null,
-      TextField: () => null,
+      TextArea: () => null,
       Separator: () => null,
     }),
     Detail: Object.assign(Container, { Metadata: Object.assign(Container, { Label: Item }) }),
@@ -84,7 +84,7 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   vi.useRealTimers();
 });
-const field = () => renderer.root.findByType(Form.TextField);
+const field = () => renderer.root.findByType(Form.TextArea);
 const submit = () => renderer.root.findByType(Action.SubmitForm).props.onSubmit({});
 const type = async (text: string) => {
   await act(async () => field().props.onChange(text));
@@ -94,7 +94,7 @@ const descriptions = () =>
 
 it("ignores whitespace and accepts only one trimmed follow-up for consecutive submits", async () => {
   await act(async () => finish("First answer"));
-  await type("   ");
+  await type(" \n \n ");
   await act(async () => submit());
   expect(streamModelResponse).toHaveBeenCalledTimes(1);
   await type("  explain more  ");
@@ -180,4 +180,18 @@ it("aborts the active request when the Chat Thread unmounts", async () => {
   const signal = vi.mocked(streamModelResponse).mock.lastCall![0].signal;
   await act(async () => renderer.unmount());
   expect(signal.aborted).toBe(true);
+});
+
+it("keeps multiline edits as a draft until submit and preserves internal newlines in the request", async () => {
+  await act(async () => finish("First answer"));
+  await type("  第一行\n第二行\n\n第三行  ");
+  expect(field().props.value).toBe("  第一行\n第二行\n\n第三行  ");
+  expect(streamModelResponse).toHaveBeenCalledTimes(1);
+  await act(async () => submit());
+  expect(streamModelResponse).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(streamModelResponse).mock.lastCall?.[0].messages.at(-1)).toEqual({
+    role: "user",
+    content: "第一行\n第二行\n\n第三行",
+  });
+  expect(field().props.value).toBe("");
 });

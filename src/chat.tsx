@@ -152,6 +152,7 @@ export function ChatThread({
           <Action.SubmitForm
             title="Send Follow-Up"
             icon={Icon.ArrowRight}
+            shortcut={{ modifiers: [], key: "return" }}
             onSubmit={() => {
               if (ask(followUp)) setFollowUp("");
             }}
@@ -194,7 +195,7 @@ export function ChatThread({
       {error ? <Form.Description key="error" text={`Request Status\n\n${error}`} /> : null}
       <Form.Separator />
       <Form.Description key="model" text={`${activeModel.provider} · ${activeModel.model}`} />
-      <Form.TextField
+      <Form.TextArea
         key="followUp"
         id="followUp"
         title="Follow-Up"
